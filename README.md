@@ -7,6 +7,24 @@ machine, transcribes the conversation in real time, and instantly provides
 compact AI answer suggestions for detected questions. All AI calls run through
 **Replicate** — a single API key is all you need.
 
+## Screenshots
+
+Live transcript with topic threading, ultra-short answer suggestions and a
+syntax-highlighted code example:
+
+![Main window](assets/screenshots/main-window.png)
+
+Screen analysis with a rendered Mermaid diagram and a quick tip:
+
+![Screen analysis and quick tip](assets/screenshots/main-window-analysis.png)
+
+The companion overlay — a persistent, auto-growing popup stack on a display of
+your choice, with follow-up actions:
+
+<p align="center"><img src="assets/screenshots/companion-overlay.png" width="440" alt="Companion overlay" /></p>
+
+*All screenshots show fictional demo content.*
+
 ## Features
 
 - **Two separate audio channels**
