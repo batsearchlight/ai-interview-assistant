@@ -26,18 +26,26 @@ jobs:
           cache: npm
       - run: npm ci
 
-      # Tag push: build and upload the artifacts to the GitHub release (draft)
-      - name: Build and publish to release
+      - name: Build
+        run: npx electron-builder --publish never
+
+      # Tag push: attach artifacts to a draft release via gh (more reliable
+      # for large uploads than electron-builder's built-in publisher)
+      - name: Upload to draft release
         if: startsWith(github.ref, 'refs/tags/')
-        run: npx electron-builder --publish always
+        shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          shopt -s nullglob
+          files=(dist/*.exe dist/*.dmg dist/*.zip dist/*.AppImage dist/*.deb dist/*.blockmap dist/latest*.yml)
+          gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
+            || gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft --title "$GITHUB_REF_NAME" \
+            || true
+          gh release upload "$GITHUB_REF_NAME" "${files[@]}" --clobber --repo "$GITHUB_REPOSITORY"
 
-      # Manual run: build only and keep the artifacts on the workflow run
-      - name: Build (no publish)
-        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
-        run: npx electron-builder --publish never
-      - name: Upload artifacts
+      # Manual run: keep the artifacts on the workflow run instead
+      - name: Upload workflow artifacts
         if: ${{ !startsWith(github.ref, 'refs/tags/') }}
         uses: actions/upload-artifact@v7
         with:

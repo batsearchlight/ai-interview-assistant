@@ -44,6 +44,9 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
     },
+    "portable": {
+      "artifactName": "${productName}-${version}-${os}-${arch}-portable.${ext}"
+    },
     "mac": {
       "target": [
         { "target": "dmg", "arch": ["universal"] },
