@@ -2,7 +2,7 @@
   "name": "interview-helper",
   "productName": "Interview Helper",
   "version": "0.1.0",
-  "description": "A real-time AI companion for practice interviews: live transcription, interview-flow aware answer suggestions, companion overlay and screen analysis — powered by Replicate.",
+  "description": "A real-time AI companion for practice interviews: live transcription, interview-flow aware answer suggestions, companion overlay and screen analysis — with freely selectable models through one bundled API.",
   "author": "Interview Helper Contributors <interview-helper@users.noreply.github.com>",
   "license": "MIT",
   "repository": {
