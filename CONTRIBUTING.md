@@ -6,8 +6,8 @@ process is deliberately lightweight.
 ## Getting set up
 
 ```bash
-git clone https://github.com/batsearchlight/interview-helper.git
-cd interview-helper
+git clone https://github.com/batsearchlight/ai-interview-assistant.git
+cd ai-interview-assistant
 npm install
 npm start
 ```
@@ -45,5 +45,5 @@ models you selected, and the exact error text — with all personal data removed
 ## Security issues
 
 Please **do not** open public issues for security problems — use
-[private vulnerability reporting](https://github.com/batsearchlight/interview-helper/security/advisories/new)
+[private vulnerability reporting](https://github.com/batsearchlight/ai-interview-assistant/security/advisories/new)
 instead. See [SECURITY.md](SECURITY.md).

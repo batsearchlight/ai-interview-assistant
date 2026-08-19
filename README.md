@@ -1,12 +1,12 @@
-# Interview Helper
+# Interview Helper — an open-source AI interview assistant
 
-<p align="center"><img src="assets/icon.png" width="128" alt="Interview Helper" /></p>
+<p align="center"><img src="assets/icon.png" width="128" alt="Interview Helper — AI interview assistant" /></p>
 
-<p align="center"><em>Live transcription and short AI answer hints for practice interviews. Runs locally, talks to Replicate.</em></p>
+<p align="center"><em>An interview copilot that runs locally: live transcription and short AI answer hints for mock interview practice, powered by your own Replicate key.</em></p>
 
 <p align="center">
-  <a href="https://github.com/batsearchlight/interview-helper/actions/workflows/ci.yml"><img src="https://github.com/batsearchlight/interview-helper/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-  <a href="https://github.com/batsearchlight/interview-helper/releases/latest"><img src="https://img.shields.io/github/v/release/batsearchlight/interview-helper?include_prereleases" alt="Latest release" /></a>
+  <a href="https://github.com/batsearchlight/ai-interview-assistant/actions/workflows/ci.yml"><img src="https://github.com/batsearchlight/ai-interview-assistant/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://github.com/batsearchlight/ai-interview-assistant/releases/latest"><img src="https://img.shields.io/github/v/release/batsearchlight/ai-interview-assistant?include_prereleases" alt="Latest release" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license" /></a>
 </p>
 
@@ -22,10 +22,15 @@ channels, so it knows who said what), transcribes everything live, and when a
 question comes in it puts a short answer hint on your screen. Two or three
 bullet points, not a wall of text.
 
-It's meant for practicing: trivia rounds, mock interviews, drilling a specific
-topic before the real thing. All AI calls go through
+It's meant for practicing: trivia rounds, mock interview practice, drilling a
+specific topic before the real thing. All AI calls go through
 [Replicate](https://replicate.com), so a single API key covers transcription,
 answers and vision, and every model can be swapped for another one.
+
+If you've come across commercial tools like Final Round AI, LockedIn AI or
+Verve AI: this is the same category — a live interview AI that suggests answers
+in real time — except it's open source, keeps everything on your machine, and
+bills against your own Replicate key instead of a subscription.
 
 ## What it looks like
 
@@ -115,7 +120,7 @@ The screenshots show demo content, not a real conversation.
 ## Getting started
 
 **Option 1 — download a build** from the
-[releases page](https://github.com/batsearchlight/interview-helper/releases/latest):
+[releases page](https://github.com/batsearchlight/ai-interview-assistant/releases/latest):
 
 | OS | File |
 |---|---|

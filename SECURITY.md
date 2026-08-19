@@ -7,7 +7,7 @@ Only the latest release is supported with security fixes.
 ## Reporting a vulnerability
 
 Please report security issues **privately** via GitHub's private vulnerability
-reporting: [open a security advisory](https://github.com/batsearchlight/interview-helper/security/advisories/new).
+reporting: [open a security advisory](https://github.com/batsearchlight/ai-interview-assistant/security/advisories/new).
 
 Do **not** open a public issue for security problems.
 
