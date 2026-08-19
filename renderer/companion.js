@@ -8,9 +8,9 @@ const confirmText = document.getElementById("confirmText");
 
 let maxHeight = 600;
 
-// Fenster an den Inhalt anpassen — es waechst nach unten, scrollt aber nie.
-// Passt der Inhalt nicht mehr auf den Bildschirm, fliegen die aeltesten
-// Vertiefungs-Popups raus (die Haupt-Karte bleibt immer stehen).
+// Fit the window to its content — it grows downwards but never scrolls.
+// When the content no longer fits on the screen, the oldest follow-up
+// popups are dropped (the main card always stays).
 function syncHeight() {
   requestAnimationFrame(() => {
     let deepPops = stackEl.querySelectorAll(".pop.deep");
@@ -47,11 +47,14 @@ function hideConfirm() {
   confirmBar.classList.remove("visible");
 }
 
+// Conversation thread: blocks are appended and stay in place. A complete
+// topic change replaces the thread — in confirmation mode only after
+// clicking "Switch".
 companionApi.onNote((payload) => {
   if (payload.maxHeight) maxHeight = payload.maxHeight;
 
   if (payload.mode === "confirm") {
-    confirmText.textContent = `Neues Thema erkannt: ${payload.topic}`;
+    confirmText.textContent = `New topic detected: ${payload.topic}`;
     confirmBar.classList.add("visible");
     syncHeight();
     return;
@@ -84,7 +87,7 @@ document.getElementById("btnClose").addEventListener("click", () => {
   companionApi.hide();
 });
 
-// Follow-up-Buttons: kurz sperren, bis der neue Block eintrifft
+// follow-up buttons: briefly disable until the new block arrives
 for (const btn of document.querySelectorAll("#actions button")) {
   btn.addEventListener("click", () => {
     companionApi.followUp(btn.dataset.mode);

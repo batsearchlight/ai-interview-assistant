@@ -2,31 +2,55 @@
 
 <p align="center"><img src="assets/icon.png" width="128" alt="Interview Helper" /></p>
 
-Companion-App fuer (Test-)Interviews: laeuft im Hintergrund auf dem eigenen Rechner,
-transkribiert das Gespraech in Echtzeit und liefert per KI sofort kompakte
-Antwortvorschlaege zu erkannten Fragen. Alle KI-Aufrufe laufen ueber **Replicate**
-— es wird nur ein einziger API-Key benoetigt.
+A companion app for (practice) interviews: it runs in the background on your own
+machine, transcribes the conversation in real time, and instantly provides
+compact AI answer suggestions for detected questions. All AI calls run through
+**Replicate** — a single API key is all you need.
 
-## Funktionsweise
+## Features
 
-- **Zwei getrennte Audiokanaele**
-  - *System-Audio (Loopback)* → Stimme der Gespraechspartner (z. B. aus Teams/Zoom/Meet)
-  - *Mikrofon* → eigene Stimme
-  - Dadurch wird der komplette Gespraechsverlauf sauber nach Sprecher getrennt abgebildet.
-- **Sprach-Segmentierung (VAD)** im Client: Aeusserungen werden per Energie-Schwelle
-  erkannt, bei Sprechpausen abgeschlossen und als WAV an Replicate geschickt.
-- **Transkription** ueber ein frei waehlbares Replicate-Modell
-  (Standard: `openai/gpt-4o-mini-transcribe`).
-- **Fragenerkennung** (Deutsch + Englisch): Fragen des Interviewers werden automatisch
-  erkannt, markiert und (bei aktivierter Auto-Antwort) sofort beantwortet.
-- **Antwortvorschlaege** ueber ein frei waehlbares Replicate-LLM mit SSE-Streaming
-  (Standard: `anthropic/claude-4.5-haiku`).
-- **Modell-Auswahl**: Beide Modelle koennen in den Einstellungen gewaehlt werden.
-  Die Auswahllisten werden live aus den Replicate-Collections `speech-to-text` und
-  `language-models` geladen; es kann aber auch jedes beliebige `owner/name`-Modell
-  eingetippt werden. Die Auswahl wird gespeichert.
-- **Companion-UI**: Fenster optional immer im Vordergrund ("Pin"), Transkript links,
-  KI-Vorschlaege rechts, manuelle Frage-Eingabe unten.
+- **Two separate audio channels**
+  - *System audio (loopback)* → the other participants' voices (e.g. from Teams/Zoom/Meet)
+  - *Microphone* → your own voice
+  - The full conversation is captured with clean per-speaker attribution.
+- **Speech segmentation (VAD)** in the client: utterances are detected via an
+  energy threshold, finalized on pauses, and sent to Replicate as WAV. Long
+  statements are split into configurable segments (default 1 s) and transcribed
+  while the speaker is still talking.
+- **Transcription** via a freely selectable Replicate model
+  (default: `openai/gpt-4o-mini-transcribe`).
+- **Interview-flow awareness**: the AI classifies every interviewer statement
+  ([TOPIC] / [FOLLOW_UP] / [NO_ACTION]), threads the conversation by topic
+  (📌 markers in both panels), answers follow-up questions with *additional*
+  information only, and stays silent when everything is already covered.
+- **Answer suggestions** via a freely selectable Replicate LLM with SSE
+  streaming (default: `anthropic/claude-4.5-haiku`) — ultra-short, scannable
+  format: the understood question as a ❓ line, then 1-2 key-point bullets.
+- **Companion mode**: checks the conversation at a configurable interval (and
+  immediately on questions) and shows helpful notes as a **persistent overlay**
+  on a display of your choice. The overlay grows as a popup stack (never
+  scrolls), keeps the thread visible while a question is open, appends
+  follow-ups below, hides itself once the question is resolved, and can require
+  confirmation before switching topics. Follow-up buttons (more / code /
+  pros-cons / examples) sit directly on the overlay.
+- **Screen analysis**: capture a predefined screen region on click and send it
+  together with the conversation context to a vision model (default:
+  `google/gemini-3-flash`) — results as short facts, optionally with a rendered
+  Mermaid diagram.
+- **Follow-up buttons on every answer card**: ➕ More, `</>` Code (with syntax
+  highlighting), ⚖ Pros/Cons, 🧩 Examples.
+- **Model selection**: all three models (STT / LLM / vision) are selectable in
+  the settings. The dropdowns are populated live from the Replicate collections
+  `speech-to-text`, `language-models` and `vision-models`; any `owner/name`
+  model can also be entered manually. Choices are persisted, and the app reads
+  each model's input schema automatically (audio/image field names,
+  `language`/`system_prompt`/`max_tokens` support), so most community models
+  work without code changes.
+- **Multi-language**: German, English, Hindi, Chinese, Japanese, Spanish,
+  French, or automatic detection — applied to transcription and answers.
+- **Session cost estimate** in the top bar, **conversation management**
+  (save / browse / delete, disabled while recording), and a **legal notice**
+  that must be accepted before recording.
 
 ## Setup
 
@@ -35,46 +59,58 @@ npm install
 npm start
 ```
 
-Beim ersten Start oeffnen sich die Einstellungen:
+On first start the legal notice and the settings open:
 
-1. **Replicate API-Key** eintragen (r8_..., von https://replicate.com/account/api-tokens).
-   Alternativ wird die Umgebungsvariable `REPLICATE_API_TOKEN` verwendet.
-2. Optional **"Modelle von Replicate laden"** klicken und STT- + Antwort-Modell waehlen.
-3. **Profil/Kontext** ausfuellen (Rolle, Skills, Projekte) — fliesst in jede Antwort ein.
+1. Enter your **Replicate API key** (r8_..., from https://replicate.com/account/api-tokens).
+   Alternatively the `REPLICATE_API_TOKEN` environment variable is used.
+2. Optionally refresh the model list and pick your STT / answer / vision models.
+3. Fill in your **profile/context** (role, skills, projects) — it flows into every answer.
 
-Dann **"Aufnahme starten"**:
-- Windows fragt nach der Bildschirmfreigabe → beliebigen Bildschirm waehlen
-  (es wird nur das **Audio** verwendet, das Videobild wird sofort verworfen).
-- Mikrofonzugriff erlauben.
+Then click **"Start recording"**:
+- Windows asks for screen sharing → pick any screen
+  (only the **audio** is used; the video track is discarded immediately).
+- Allow microphone access.
 
-## Hinweise
+## Notes
 
-- System-Audio-Loopback funktioniert unter **Windows** direkt (Electron `audio: 'loopback'`).
-- Key und Modell-Auswahl werden lokal in `%APPDATA%/interview-helper/settings.json` gespeichert.
-- Die App liest das Input-Schema des gewaehlten Modells automatisch von Replicate
-  (Name des Audio-Feldes, `language`-/`system_prompt`-/`max_tokens`-Unterstuetzung),
-  daher funktionieren auch die meisten Community-Modelle ohne Anpassung.
-- Fuer minimale Latenz: kleine/schnelle Modelle waehlen (z. B. `anthropic/claude-4.5-haiku`
-  oder `openai/gpt-5-mini` fuer Antworten).
-- Gedacht fuer Test-/Uebungsinterviews. In echten Gespraechen gilt: Aufnahme/Transkription
-  von Gespraechspartnern nur mit deren Einwilligung (in DE: § 201 StGB).
+- System audio loopback works out of the box on **Windows** (Electron `audio: 'loopback'`).
+- The key, model choices and saved conversations are stored locally in
+  `%APPDATA%/interview-helper/`.
+- For minimal latency pick small/fast models (e.g. `anthropic/claude-4.5-haiku`
+  or `openai/gpt-5-mini` for answers). For better transcription accuracy,
+  increase the segment length to 3-5 s.
+- If you share your screen in a meeting, put the companion overlay on a display
+  you are **not** sharing.
+- Intended for practice and mock interviews. Recording real conversation
+  partners requires their explicit consent (in Germany: § 201 StGB; GDPR
+  applies additionally).
 
-## Lizenz
-
-MIT — siehe [LICENSE](LICENSE). Gebundelte Bibliotheken: [Mermaid](https://mermaid.js.org/) (MIT),
-[highlight.js](https://highlightjs.org/) (BSD-3-Clause), jeweils lokal unter `renderer/vendor/`.
-
-## Architektur
+## Architecture
 
 ```
-main.js          Electron-Main: Fenster, Settings, Replicate-Aufrufe
-                 (Predictions mit "Prefer: wait" fuer STT, SSE-Streaming fuer LLM,
-                 Files-API fuer laengere Audio-Chunks, Schema-Erkennung pro Modell,
-                 Modell-Listen aus Replicate-Collections)
-preload.js       IPC-Bruecke (contextBridge)
+main.js               Electron main: windows, settings, Replicate calls
+                      (predictions with "Prefer: wait" for STT, SSE streaming
+                      for LLMs, Files API for larger uploads, per-model schema
+                      detection, model lists from Replicate collections),
+                      companion overlay + prompts, cost tracking, conversations
+preload.js            IPC bridge (contextBridge)
+overlay-preload.js    IPC bridge for the region-selection overlay
+companion-preload.js  IPC bridge for the companion overlay
 renderer/
-  index.html     UI (Topbar, Transkript, Antworten, Einstellungen mit Modell-Auswahl)
-  app.js         Audio-Capture (getDisplayMedia-Loopback + Mikrofon),
-                 Energie-VAD + Aeusserungs-Segmentierung, Fragenerkennung, Rendering
-  pcm-worklet.js AudioWorklet: Float32 → PCM16 @ 16 kHz
+  index.html          main UI (top bar, conversation bar, transcript, answers,
+                      settings and legal dialogs)
+  app.js              audio capture (getDisplayMedia loopback + microphone),
+                      energy VAD + utterance segmentation, question detection,
+                      interview-flow control-line parsing, topic threading,
+                      rendering (Mermaid + highlight.js), conversations
+  overlay.html/js     drag-to-select screen region
+  companion.html/js   companion overlay (popup stack, auto-resizing, actions)
+  pcm-worklet.js      AudioWorklet: Float32 → PCM16 @ 16 kHz
+  vendor/             mermaid.min.js, highlight.min.js + theme (bundled locally)
 ```
+
+## License
+
+MIT — see [LICENSE](LICENSE). Bundled libraries: [Mermaid](https://mermaid.js.org/)
+(MIT) and [highlight.js](https://highlightjs.org/) (BSD-3-Clause), both vendored
+locally under `renderer/vendor/`.

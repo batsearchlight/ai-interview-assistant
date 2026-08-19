@@ -13,7 +13,7 @@ let win = null;
 let overlayWin = null;
 
 // ---------------------------------------------------------------------------
-// Settings (JSON-Datei im userData-Verzeichnis)
+// Settings (JSON file in the userData directory)
 // ---------------------------------------------------------------------------
 
 const DEFAULT_SETTINGS = {
@@ -21,26 +21,26 @@ const DEFAULT_SETTINGS = {
   sttModel: "openai/gpt-4o-mini-transcribe",
   answerModel: "anthropic/claude-4.5-haiku",
   visionModel: "google/gemini-3-flash",
-  language: "de",
-  maxSegmentSec: 1, // lange Redebeitraege alle N Sekunden zerteilen
+  language: "en",
+  maxSegmentSec: 1, // split long speech into segments every N seconds
   autoAnswer: true,
   companionMode: false,
   companionIntervalSec: 20,
-  companionDisplayId: null, // Display fuer die Overlay-Einblendung
-  topicConfirm: false, // Themenwechsel im Companion erst nach Bestaetigung
+  companionDisplayId: null, // display for the companion overlay
+  topicConfirm: false, // companion topic changes require user confirmation
   alwaysOnTop: true,
   legalAccepted: false,
-  captureRegion: null, // { displayId, x, y, width, height } (DIP, relativ zum Display)
+  captureRegion: null, // { displayId, x, y, width, height } (DIP, relative to display)
   profile:
-    "Bewerber:in fuer eine Softwareentwickler-Stelle. Erfahrung mit JavaScript, TypeScript und Web-Entwicklung.",
+    "Candidate for a software developer position. Experienced with JavaScript, TypeScript and web development.",
 };
 
 function settingsPath() {
   return path.join(app.getPath("userData"), "settings.json");
 }
 
-// Replicate-Modelle heissen immer "owner/name" — alles andere (z. B. Reste
-// aus einer aelteren App-Version) wird auf die Defaults zurueckgesetzt.
+// Replicate models are always named "owner/name" — anything else (e.g.
+// leftovers from an older app version) is reset to the defaults.
 const MODEL_RE = /^[\w.-]+\/[\w.-]+$/;
 
 function sanitizeModels(s) {
@@ -76,12 +76,12 @@ function sendToRenderer(channel, payload) {
 }
 
 // ---------------------------------------------------------------------------
-// Kosten-Tracking (Schaetzung fuer die laufende Session)
+// Cost tracking (estimate for the running session)
 // ---------------------------------------------------------------------------
 
-// Grobe Preisliste (USD). Token-Modelle: [Input, Output] pro Million Tokens;
-// Audio-Modelle: pro Audio-Minute. Nicht gelistete Modelle werden als
-// "ohne Preisdaten" gezaehlt.
+// Rough price list (USD). Token models: [input, output] per million tokens;
+// audio models: per audio minute. Models not listed here are counted as
+// "no pricing data".
 const PRICING = {
   tokenModels: {
     "anthropic/claude-4.5-haiku": [1, 5],
@@ -100,7 +100,7 @@ const PRICING = {
     "openai/gpt-4o-mini-transcribe": 0.003,
     "openai/gpt-4o-transcribe": 0.006,
   },
-  // Community-STT: GPU-Rechenzeit, USD pro Sekunde predict_time
+  // Community STT: GPU compute time, USD per second of predict_time
   audioPerSecond: {
     "openai/whisper": 0.000725,
     "vaibhavs10/incredibly-fast-whisper": 0.000975,
@@ -120,14 +120,14 @@ function addUsage(usd) {
 function trackLlmCost(model, metrics, promptChars, outputChars) {
   const p = PRICING.tokenModels[model];
   if (!p) return addUsage(null);
-  // echte Token-Zahlen aus den Prediction-Metrics, sonst ~4 Zeichen/Token
+  // real token counts from the prediction metrics, else ~4 chars/token
   const tIn = metrics?.input_token_count ?? Math.ceil(promptChars / 4);
   const tOut = metrics?.output_token_count ?? Math.ceil(outputChars / 4);
   addUsage((tIn * p[0] + tOut * p[1]) / 1e6);
 }
 
 // ---------------------------------------------------------------------------
-// Replicate-HTTP-Helfer
+// Replicate HTTP helpers
 // ---------------------------------------------------------------------------
 
 const REPLICATE_BASE = "https://api.replicate.com/v1";
@@ -152,8 +152,8 @@ async function repJson(url, options = {}) {
   return res.json();
 }
 
-// Modell-Schema einmalig laden und cachen, damit beliebige vom User gewaehlte
-// Modelle funktionieren (Feldnamen fuer Audio/Bild/System-Prompt variieren).
+// Load and cache each model's schema once so arbitrary user-selected models
+// work (field names for audio/image/system prompt vary between models).
 const modelInfoCache = new Map();
 
 async function getModelInfo(model) {
@@ -169,7 +169,7 @@ async function getModelInfo(model) {
     maxTokensField: null, // max_tokens | max_new_tokens | max_output_tokens
     maxTokensMin: null,
     maxTokensMax: null,
-    versionId: null, // fuer Community-Modelle (Version-basierte Predictions)
+    versionId: null, // for community models (version-based predictions)
     useVersionEndpoint: false,
   };
   try {
@@ -186,11 +186,11 @@ async function getModelInfo(model) {
         uriArrayFields.push(name);
     }
 
-    // Audio-Eingabefeld (URI-Feld, dessen Name nach Audio klingt)
+    // audio input field (URI field whose name sounds like audio)
     const audioField = uriFields.find((n) => /audio|voice|speech|file/i.test(n));
     if (audioField) info.audioField = audioField;
 
-    // Bild-Eingabefeld: einzelne URI oder URI-Array
+    // image input field: single URI or URI array
     const imgSingle = uriFields.find((n) => /image|img|photo|media/i.test(n));
     const imgArray = uriArrayFields.find((n) => /image|img|photo|media/i.test(n));
     if (imgSingle) {
@@ -216,14 +216,14 @@ async function getModelInfo(model) {
       if (typeof p.maximum === "number") info.maxTokensMax = p.maximum;
     }
   } catch {
-    // Fallback-Heuristik bleibt bestehen
+    // keep the fallback heuristics
   }
   modelInfoCache.set(model, info);
   return info;
 }
 
-// Prediction-Output in Text umwandeln (Modelle liefern String, String-Array
-// oder Objekte mit text/transcription-Feld)
+// Convert prediction output to text (models return a string, an array of
+// strings, or objects with a text/transcription field)
 function outputToText(output) {
   if (output == null) return "";
   if (typeof output === "string") return output;
@@ -236,8 +236,8 @@ function outputToText(output) {
   return String(output);
 }
 
-// 422-Validierungsfehler wie "input.max_tokens: Must be greater than or
-// equal to 1024" automatisch korrigieren (Grenzwert aus der Meldung parsen)
+// Auto-fix 422 validation errors like "input.max_tokens: Must be greater
+// than or equal to 1024" by parsing the limit out of the error message
 function applyConstraintFix(body, message) {
   const m = message.match(
     /input\.(\w+):\s*Must be (greater|less) than or equal to (\d+(?:\.\d+)?)/i
@@ -267,9 +267,9 @@ async function createPrediction(model, body, headers = {}) {
   }
 }
 
-// Prediction erzeugen: offizielle Modelle laufen ueber
-// /models/{owner}/{name}/predictions, Community-Modelle nur ueber
-// /predictions mit Versions-ID. Bei 404 automatisch umschalten (gecacht).
+// Create a prediction: official models run via
+// /models/{owner}/{name}/predictions, community models only via
+// /predictions with a version ID. On 404 switch automatically (cached).
 async function createPredictionRaw(model, body, headers = {}) {
   const info = await getModelInfo(model);
   const allHeaders = { "Content-Type": "application/json", ...headers };
@@ -283,12 +283,12 @@ async function createPredictionRaw(model, body, headers = {}) {
       });
     } catch (err) {
       if (!/HTTP 404/.test(err.message) || !info.versionId) throw err;
-      info.useVersionEndpoint = true; // ab jetzt direkt den Version-Endpoint
+      info.useVersionEndpoint = true; // use the version endpoint from now on
     }
   }
 
   if (!info.versionId) {
-    throw new Error(`Replicate HTTP 404: Modell ${model} hat keine Version`);
+    throw new Error(`Replicate HTTP 404: model ${model} has no version`);
   }
   return repJson(`${REPLICATE_BASE}/predictions`, {
     method: "POST",
@@ -297,8 +297,8 @@ async function createPredictionRaw(model, body, headers = {}) {
   });
 }
 
-// Sprachparameter an das Modell anpassen: manche Modelle erwarten
-// ISO-Codes ("de"), andere Sprachnamen aus einem Enum ("german")
+// Adapt the language parameter to the model: some expect ISO codes ("de"),
+// others expect language names from an enum ("german")
 const LANGUAGE_NAMES = {
   de: "german",
   en: "english",
@@ -309,22 +309,22 @@ const LANGUAGE_NAMES = {
   fr: "french",
 };
 
-// Anzeigename fuer die Prompts ("Antworte auf ...")
+// Display names used inside the prompts ("Respond in ...")
 const LANGUAGE_LABELS = {
-  de: "Deutsch",
-  en: "Englisch",
+  de: "German",
+  en: "English",
   hi: "Hindi",
-  zh: "Chinesisch",
-  ja: "Japanisch",
-  es: "Spanisch",
-  fr: "Franzoesisch",
+  zh: "Chinese",
+  ja: "Japanese",
+  es: "Spanish",
+  fr: "French",
 };
 
 function answerLanguageRule() {
   const label = LANGUAGE_LABELS[settings.language];
   return label
-    ? `- Antworte auf ${label}.`
-    : "- Sprache der Antwort = Sprache der Frage.";
+    ? `- Respond in ${label}.`
+    : "- Respond in the same language as the question.";
 }
 
 function resolveLanguage(info, code) {
@@ -332,7 +332,7 @@ function resolveLanguage(info, code) {
   if (info.languageEnum.includes(code)) return code;
   const name = LANGUAGE_NAMES[code];
   if (name && info.languageEnum.includes(name)) return name;
-  return null; // kein passender Wert — Parameter weglassen (Auto-Erkennung)
+  return null; // no matching value — omit the parameter (auto-detect)
 }
 
 async function waitForPrediction(pred, timeoutMs = 90000) {
@@ -340,7 +340,7 @@ async function waitForPrediction(pred, timeoutMs = 90000) {
   let current = pred;
   while (current.status === "starting" || current.status === "processing") {
     if (Date.now() - start > timeoutMs) {
-      throw new Error("Replicate-Prediction Timeout");
+      throw new Error("Replicate prediction timeout");
     }
     await new Promise((r) => setTimeout(r, 600));
     current = await repJson(current.urls.get);
@@ -351,7 +351,7 @@ async function waitForPrediction(pred, timeoutMs = 90000) {
   return current;
 }
 
-// Kleine Dateien als Data-URI, groessere ueber die Replicate Files API
+// Small files as data URIs, larger ones via the Replicate Files API
 async function bufferToUrl(buffer, mime, filename) {
   if (buffer.length <= 180 * 1024) {
     return `data:${mime};base64,${buffer.toString("base64")}`;
@@ -366,7 +366,7 @@ async function bufferToUrl(buffer, mime, filename) {
 }
 
 // ---------------------------------------------------------------------------
-// Transkription: WAV bauen, hochladen, Prediction ausfuehren
+// Transcription: build WAV, upload, run prediction
 // ---------------------------------------------------------------------------
 
 function pcm16ToWav(pcm, sampleRate = 16000) {
@@ -408,8 +408,8 @@ async function transcribeUtterance(channel, itemId, pcmBuffer) {
 
     sendToRenderer("transcript", { channel, itemId, text, final: true });
 
-    // Kosten: pro Audio-Minute (offizielle Modelle) oder pro
-    // Rechenzeit-Sekunde (Community-Modelle auf GPU-Hardware)
+    // Cost: per audio minute (official models) or per second of compute
+    // time (community models on GPU hardware)
     const minutes = pcmBuffer.length / 2 / 16000 / 60;
     const perMin = PRICING.audioModels[model];
     const perSec = PRICING.audioPerSecond[model];
@@ -420,7 +420,7 @@ async function transcribeUtterance(channel, itemId, pcmBuffer) {
   } catch (err) {
     sendToRenderer("transcript", { channel, itemId, text: "", final: true });
     const msg = /404/.test(err.message)
-      ? `Modell "${settings.sttModel}" wurde auf Replicate nicht gefunden (404). Bitte in den Einstellungen ein gueltiges Transkriptions-Modell waehlen.`
+      ? `Model "${settings.sttModel}" was not found on Replicate (404). Please pick a valid transcription model in the settings.`
       : err.message;
     sendToRenderer("stt-status", { channel, status: "error", message: msg });
   }
@@ -432,67 +432,67 @@ async function transcribeUtterance(channel, itemId, pcmBuffer) {
 
 function buildSystemPrompt() {
   return [
-    "Du bist ein Echtzeit-Interview-Assistent. Die interviewte Person liest deine Antwort WAEHREND sie spricht — sie hat nur 2-3 Sekunden zum Erfassen.",
+    "You are a real-time interview assistant. The interviewee reads your answer WHILE they are speaking — they only have 2-3 seconds to grasp it.",
     "",
-    `Profil der interviewten Person: ${settings.profile}`,
+    `Interviewee profile: ${settings.profile}`,
     "",
-    "Wichtig — fehlerhafte Transkription: Die Spracherkennung verstuemmelt oft Fachbegriffe (z. B. \"Angela directives\" statt \"Angular directives\", \"Kuba Netes\" statt \"Kubernetes\"). Rekonstruiere die GEMEINTEN Begriffe immer aus dem Gespraechskontext und dem Profil der interviewten Person.",
+    'Important — imperfect transcription: speech recognition often mangles technical terms (e.g. "Angela directives" instead of "Angular directives", "Cuba netes" instead of "Kubernetes"). Always reconstruct the INTENDED terms from the conversation context and the interviewee profile.',
     "",
-    "Ausgabeformat (strikt, keine Abweichung):",
-    "Zeile 1: \"❓ \" + die von dir verstandene Frage, sauber umformuliert mit den rekonstruierten Fachbegriffen, maximal 10 Woerter.",
-    "Danach die Antwort: 1-2 Stichpunkte mit \"- \", maximal 8 Woerter pro Punkt.",
-    "Ein Punkt reicht meistens — nur bei Bedarf zwei.",
-    "AUSNAHME: Verlangt die Frage erkennbar eine ausfuehrlichere Antwort (\"erklaeren Sie im Detail\", Vergleich, mehrteilige Frage), dann bis zu 4 Stichpunkte — aber weiterhin nur das Noetigste fuer eine korrekte Antwort.",
+    "Output format (strict, no deviation):",
+    'Line 1: "❓ " + the question as you understood it, cleanly rephrased with the reconstructed technical terms, at most 10 words.',
+    'Then the answer: 1-2 bullet points starting with "- ", at most 8 words per point.',
+    "One point is usually enough — two only if needed.",
+    'EXCEPTION: if the question clearly demands a longer answer ("explain in detail", a comparison, a multi-part question), up to 4 bullet points — but still only the minimum required for a correct answer.',
     "",
-    "Regeln:",
-    "- Gib NUR die Information, die gefordert ist — keine ungefragten Ergaenzungen, keine Extra-Tipps, kein Zusatzkontext.",
-    "- Schluesselbegriffe statt Saetze. Konkrete Zahlen, Fachbegriffe, Namen.",
-    "- Keine Fuellwoerter, keine Einleitung, keine Erklaerung, kein Meta-Kommentar.",
-    "- Bei Ja/Nein-Fragen beginnt der erste Punkt mit \"Ja:\" oder \"Nein:\".",
+    "Rules:",
+    "- Provide ONLY the information that was asked for — no unrequested additions, no extra tips, no extra context.",
+    "- Key terms instead of sentences. Concrete numbers, technical terms, names.",
+    "- No filler words, no introduction, no explanation, no meta commentary.",
+    '- For yes/no questions the first point starts with "Yes:" or "No:".',
     answerLanguageRule(),
     "",
-    "Beispiel:",
-    "❓ Warum sollten wir Sie einstellen?",
-    "- 5 Jahre TypeScript, 3 Produktions-Apps",
-    "- Staerke: schnelle Einarbeitung in fremden Code",
+    "Example:",
+    "❓ Why should we hire you?",
+    "- 5 years TypeScript, 3 production apps",
+    "- Strength: fast onboarding into unfamiliar code",
   ].join("\n");
 }
 
 function historyToText(history) {
   return history && history.length
     ? history.map((h) => `${h.speaker}: ${h.text}`).join("\n")
-    : "(noch kein Gespraechsverlauf)";
+    : "(no conversation history yet)";
 }
 
 function buildUserPrompt(question, history, flow = {}) {
   const parts = [];
   if (history && history.length) {
-    parts.push(`Bisheriger Gespraechsverlauf (gekuerzt):\n${historyToText(history)}`);
+    parts.push(`Conversation so far (truncated):\n${historyToText(history)}`);
   }
   parts.push(
     flow.topic
-      ? `Aktuelles Interview-Thema: ${flow.topic}`
-      : "Aktuelles Interview-Thema: noch keines erfasst."
+      ? `Current interview topic: ${flow.topic}`
+      : "Current interview topic: none recorded yet."
   );
   if (flow.suggestions && flow.suggestions.length) {
     parts.push(
-      `Deine bisherigen Antwortvorschlaege zum aktuellen Thema:\n${flow.suggestions.join("\n---\n")}`
+      `Your previous answer suggestions for the current topic:\n${flow.suggestions.join("\n---\n")}`
     );
   }
   parts.push(
-    `Aktuelle Aussage des Interviewers (Transkription, evtl. fehlerhaft): "${question}"`
+    `Latest interviewer statement (transcription, possibly imperfect): "${question}"`
   );
   parts.push(
     [
-      "Interview-Ablauf: Frage → Antwort der interviewten Person → dann entweder vertiefende Nachfrage zum selben Thema ODER Wechsel zur naechsten Frage.",
-      "Ordne die aktuelle Aussage ein und beginne deine Ausgabe mit GENAU EINER Steuerzeile:",
-      "[THEMA: <Themenname, max 4 Woerter>] — neue Frage / neues Thema beginnt. Das gilt AUCH, wenn die Aussage keine grammatische Frage ist: ein in den Raum gestellter Fachbegriff (\"So, Angular Directives.\"), eine Aufforderung (\"Erzaehlen Sie mal ...\") oder ein erkennbarer Uebergang zur ersten/naechsten Interviewfrage zaehlen als neues Thema.",
-      "[VERTIEFUNG] — weitergehende Nachfrage zum aktuellen Thema.",
-      "[KEINE_AKTION] — kein neuer Vorschlag noetig: Frage ist durch deine bisherigen Vorschlaege bereits abgedeckt, oder es ist keine echte neue Frage (Bestaetigung, Weiterreden, Smalltalk).",
+      "Interview flow: question → interviewee answers → then either a deeper follow-up on the same topic OR a switch to the next question.",
+      "Classify the current statement and start your output with EXACTLY ONE control line:",
+      '[TOPIC: <topic name, max 4 words>] — a new question / new topic begins. This ALSO applies when the statement is not a grammatical question: a technical term thrown into the room ("So, Angular directives."), a request ("Tell me about ..."), or a recognizable transition to the first/next interview question all count as a new topic.',
+      "[FOLLOW_UP] — a deeper follow-up question on the current topic.",
+      "[NO_ACTION] — no new suggestion needed: the question is already covered by your previous suggestions, or it is not a real new question (acknowledgement, continued talking, small talk).",
       "",
-      "Nach [KEINE_AKTION]: Ausgabe sofort beenden, nichts weiter schreiben.",
-      "Nach [THEMA: ...]: neue Zeile, dann ❓-Zeile + 1-2 ultrakurze Stichpunkte.",
-      "Nach [VERTIEFUNG]: neue Zeile, dann ❓-Zeile (die Nachfrage) + 1-3 Stichpunkte mit AUSSCHLIESSLICH neuen Zusatzinfos, die deine bisherigen Vorschlaege ergaenzen — nichts wiederholen.",
+      "After [NO_ACTION]: end your output immediately, write nothing else.",
+      "After [TOPIC: ...]: new line, then the ❓ line + 1-2 ultra-short bullet points.",
+      "After [FOLLOW_UP]: new line, then the ❓ line (the follow-up question) + 1-3 bullet points containing ONLY new additional information that complements your previous suggestions — repeat nothing.",
     ].join("\n")
   );
   return parts.join("\n\n");
@@ -500,29 +500,29 @@ function buildUserPrompt(question, history, flow = {}) {
 
 function buildVisionSystemPrompt() {
   return [
-    "Du bist ein Echtzeit-Interview-Assistent mit Blick auf den Bildschirm der interviewten Person. Sie liest deine Ausgabe WAEHREND des Gespraechs — sie hat nur wenige Sekunden.",
-    "Du erhaeltst einen Screenshot eines gewaehlten Bildschirmbereichs plus den juengsten Gespraechsverlauf. Entscheide selbst, was JETZT am meisten hilft.",
+    "You are a real-time interview assistant with a view of the interviewee's screen. They read your output DURING the conversation — they only have a few seconds.",
+    "You receive a screenshot of a selected screen region plus the most recent conversation history. Decide yourself what helps most RIGHT NOW.",
     "",
-    "Ausgabeformat (strikt):",
-    "- Maximal 5 Stichpunkte, beginnend mit \"- \", je maximal 8 Woerter.",
-    "- Nur konkrete Fakten aus Screenshot + Gespraech: Zahlen, Anforderungen, Fehlermeldungen, Namen.",
-    "- Das Wichtigste IMMER als ersten Stichpunkt.",
-    "- Keine Einleitung, keine Bildbeschreibung, kein Meta-Kommentar, keine Fuellwoerter.",
-    "- Optional GENAU EIN kleines Mermaid-Diagramm in einem ```mermaid Codeblock (flowchart TD oder LR, maximal 8 Knoten, Labels maximal 3 Woerter) — nur wenn Ablauf/Struktur visuell schneller erfassbar ist.",
+    "Output format (strict):",
+    '- At most 5 bullet points starting with "- ", at most 8 words each.',
+    "- Only concrete facts from the screenshot + conversation: numbers, requirements, error messages, names.",
+    "- The most important point ALWAYS comes first.",
+    "- No introduction, no image description, no meta commentary, no filler words.",
+    "- Optionally EXACTLY ONE small Mermaid diagram in a ```mermaid code block (flowchart TD or LR, at most 8 nodes, labels at most 3 words) — only if a flow/structure is faster to grasp visually.",
     answerLanguageRule(),
   ].join("\n");
 }
 
 function buildVisionUserPrompt(history) {
   return [
-    `Juengster Gespraechsverlauf:\n${historyToText(history)}`,
+    `Most recent conversation history:\n${historyToText(history)}`,
     "",
-    "Analysiere den angehaengten Screenshot im Kontext dieses Gespraechs und zeige mir die hilfreichsten Informationen an.",
+    "Analyze the attached screenshot in the context of this conversation and show me the most helpful information.",
   ].join("\n");
 }
 
 // ---------------------------------------------------------------------------
-// LLM-Aufrufe (SSE-Streaming mit Polling-Fallback)
+// LLM calls (SSE streaming with polling fallback)
 // ---------------------------------------------------------------------------
 
 async function streamSse(url, onDelta) {
@@ -550,7 +550,7 @@ async function streamSse(url, onDelta) {
       for (const line of rawEvent.split("\n")) {
         if (line.startsWith("event:")) eventType = line.slice(6).trim();
         else if (line.startsWith("data:")) {
-          // SSE: genau ein fuehrendes Leerzeichen nach "data:" entfernen
+          // SSE: strip exactly one leading space after "data:"
           let d = line.slice(5);
           if (d.startsWith(" ")) d = d.slice(1);
           dataLines.push(d);
@@ -559,14 +559,14 @@ async function streamSse(url, onDelta) {
       const data = dataLines.join("\n");
 
       if (eventType === "output") onDelta(data);
-      else if (eventType === "error") throw new Error(data || "Stream-Fehler");
+      else if (eventType === "error") throw new Error(data || "stream error");
       else if (eventType === "done") return;
     }
   }
 }
 
-// Gewuenschtes Token-Limit setzen, aber an die Schema-Grenzen des Modells
-// anpassen (manche Modelle verlangen z. B. mindestens 1024)
+// Set the desired token limit, clamped to the model's schema bounds
+// (some models require a minimum of e.g. 1024)
 function setMaxTokens(input, info, desired) {
   if (!info.maxTokensField) return;
   let v = desired;
@@ -575,8 +575,8 @@ function setMaxTokens(input, info, desired) {
   input[info.maxTokensField] = v;
 }
 
-// Summe aller String-Felder eines Inputs (fuer die Token-Schaetzung),
-// ohne Data-URIs (Bilder/Audio) mitzuzaehlen
+// Sum of all string fields of an input (for the token estimate),
+// excluding data URIs (images/audio)
 function promptCharsOf(input) {
   let chars = 0;
   for (const v of Object.values(input)) {
@@ -587,7 +587,7 @@ function promptCharsOf(input) {
   return chars;
 }
 
-// Prediction ausfuehren, Deltas an onDelta liefern, Gesamttext zurueckgeben
+// Run a prediction, deliver deltas to onDelta, return the full text
 async function runPrediction(model, input, onDelta) {
   const pred = await createPrediction(model, { input, stream: true });
 
@@ -599,7 +599,7 @@ async function runPrediction(model, input, onDelta) {
       full += delta;
       if (onDelta) onDelta(delta);
     });
-    // Metrics (echte Token-Zahlen) nach Stream-Ende nachladen
+    // fetch metrics (real token counts) after the stream ends
     try {
       metrics = (await repJson(pred.urls.get)).metrics || null;
     } catch {}
@@ -632,26 +632,26 @@ async function generateAnswer(question, history, flow, answerId) {
   } else {
     input.prompt = `${buildSystemPrompt()}\n\n---\n\n${buildUserPrompt(question, history, flow)}`;
   }
-  // Obergrenze, kein Ziel — die Kuerze erzwingt der Prompt. 1024 erfuellt
-  // zugleich das Minimum, das manche Modelle serverseitig verlangen.
+  // An upper bound, not a target — the prompt enforces brevity. 1024 also
+  // satisfies the minimum some models enforce server-side.
   setMaxTokens(input, info, 1024);
 
   await runStreamingPrediction(model, input, answerId);
 }
 
-// Schnell-Tipp: nur der Gespraechsverlauf, kein explizites Frage-Ziel.
-// Das Modell entscheidet selbst, was gerade am meisten hilft.
+// Quick tip: only the conversation history, no explicit question target.
+// The model decides on its own what helps most right now.
 function buildQuickTipPrompt(history) {
   return [
-    `Juengster Gespraechsverlauf:\n${historyToText(history)}`,
+    `Most recent conversation history:\n${historyToText(history)}`,
     "",
-    "Kein expliziter Trigger — die interviewte Person hat manuell um Hilfe gebeten.",
-    "Entscheide selbst, was JETZT am meisten hilft, genau eines davon:",
-    "a) Antwortvorschlag auf die zuletzt offene Frage/Aussage des Interviewers,",
-    "b) taktischer Tipp (z. B. Rueckfrage stellen, Beispiel bringen, Punkt vertiefen),",
-    "c) das eine Detail/Argument, das in der Situation noch fehlt.",
+    "No explicit trigger — the interviewee manually asked for help.",
+    "Decide yourself what helps most RIGHT NOW, exactly one of:",
+    "a) an answer suggestion for the interviewer's most recent open question/statement,",
+    "b) a tactical tip (e.g. ask a clarifying question, give an example, go deeper on a point),",
+    "c) the one detail/argument still missing in this situation.",
     "",
-    "Antworte im vorgegebenen Format: ❓-Zeile (worauf du dich beziehst), dann 1-2 ultrakurze Stichpunkte.",
+    "Respond in the given format: ❓ line (what you are referring to), then 1-2 ultra-short bullet points.",
   ].join("\n");
 }
 
@@ -672,47 +672,47 @@ async function generateQuickTip(history, answerId) {
 }
 
 // ---------------------------------------------------------------------------
-// Follow-ups auf Antworten: Mehr / Code / Pro-Kontra / Beispiele
+// Follow-ups on answers: more / code / pros-cons / examples
 // ---------------------------------------------------------------------------
 
 const FOLLOWUP_LABELS = {
-  elaborate: "➕ Mehr dazu",
-  code: "</> Code-Beispiel",
-  proscons: "⚖ Pro & Kontra",
-  examples: "🧩 Beispiele",
+  elaborate: "➕ More",
+  code: "</> Code example",
+  proscons: "⚖ Pros & cons",
+  examples: "🧩 Examples",
 };
 
 function followUpInstruction(mode) {
   switch (mode) {
     case "code":
       return [
-        "Gib ein kleines, direkt nutzbares Code-Beispiel passend zur Frage.",
-        "Ausgabe: maximal 1 kurze Kontextzeile, dann GENAU EIN Codeblock in der Form ```sprache (z. B. ```js, ```python) mit maximal ~20 Zeilen idiomatischem Code, danach maximal 1 kurze Hinweiszeile.",
+        "Provide a small, directly usable code example matching the question.",
+        "Output: at most 1 short context line, then EXACTLY ONE code block in the form ```language (e.g. ```js, ```python) with at most ~20 lines of idiomatic code, then at most 1 short note line.",
       ].join("\n");
     case "proscons":
-      return "Erstelle eine kompakte Pro/Kontra-Liste zur Frage: zuerst \"✅ Pro:\" mit 2-4 Stichpunkten, dann \"❌ Kontra:\" mit 2-4 Stichpunkten, je maximal 8 Woerter. Optional eine kurze Fazit-Zeile am Ende.";
+      return 'Create a compact pros/cons list for the question: first "✅ Pros:" with 2-4 bullet points, then "❌ Cons:" with 2-4 bullet points, at most 8 words each. Optionally one short conclusion line at the end.';
     case "examples":
-      return "Gib 2-3 konkrete Beispiele (je 1-2 Zeilen): reale Situationen, Zahlen oder Formulierungen, die man im Interview direkt sagen kann.";
+      return "Give 2-3 concrete examples (1-2 lines each): real situations, numbers, or phrasings that can be said directly in the interview.";
     default: // elaborate
-      return "Vertiefe die bisherige Kurzantwort NUR ETWAS: maximal 4 kurze Stichpunkte mit neuen Details (Zahlen, Begruendung, kurzes Beispiel). Wiederhole nichts bereits Gesagtes.";
+      return "Expand the previous short answer ONLY SLIGHTLY: at most 4 short bullet points with new details (numbers, reasoning, a short example). Repeat nothing already said.";
   }
 }
 
 function buildFollowUpSystem() {
   return [
-    "Du bist ein Echtzeit-Interview-Assistent. Die interviewte Person liest deine Ausgabe WAEHREND des Gespraechs — bleib kompakt und konkret.",
-    `Profil der interviewten Person: ${settings.profile}`,
-    "Keine Einleitung, keine Wiederholung der Frage, kein Meta-Kommentar.",
+    "You are a real-time interview assistant. The interviewee reads your output DURING the conversation — stay compact and concrete.",
+    `Interviewee profile: ${settings.profile}`,
+    "No introduction, no repetition of the question, no meta commentary.",
     answerLanguageRule(),
   ].join("\n");
 }
 
 function buildFollowUpPrompt(mode, question, answer, history) {
   return [
-    `Juengster Gespraechsverlauf:\n${historyToText(history)}`,
+    `Most recent conversation history:\n${historyToText(history)}`,
     "",
-    `Frage im Interview: ${question}`,
-    `Bisherige Kurzantwort:\n${answer}`,
+    `Interview question: ${question}`,
+    `Previous short answer:\n${answer}`,
     "",
     followUpInstruction(mode),
   ].join("\n");
@@ -731,39 +731,39 @@ async function generateFollowUp(mode, question, answer, history, answerId) {
   }
   setMaxTokens(input, info, 1024);
 
-  await runStreamingPrediction(model, input, answerId);
+  return runStreamingPrediction(model, input, answerId);
 }
 
 // ---------------------------------------------------------------------------
-// Companion Mode: Verlauf pruefen und ggf. Notiz als Overlay einblenden
+// Companion mode: check the conversation and show notes as an overlay
 // ---------------------------------------------------------------------------
 
 function buildCompanionPrompt(history, flow = {}) {
   return [
-    `Juengster Gespraechsverlauf:\n${historyToText(history)}`,
+    `Most recent conversation history:\n${historyToText(history)}`,
     "",
     flow.topic
-      ? `Aktuelles Interview-Thema (Overlay ist dazu eingeblendet): ${flow.topic}`
-      : "Aktuelles Interview-Thema: noch keines erfasst.",
+      ? `Current interview topic (the overlay currently shows it): ${flow.topic}`
+      : "Current interview topic: none recorded yet.",
     flow.suggestions && flow.suggestions.length
-      ? `Deine bisherigen Vorschlaege zum aktuellen Thema:\n${flow.suggestions.join("\n---\n")}`
+      ? `Your previous suggestions for the current topic:\n${flow.suggestions.join("\n---\n")}`
       : "",
     "",
-    "Aufgabe: Ordne die aktuelle Interview-Situation ein. Beginne deine Ausgabe mit GENAU EINER Steuerzeile:",
-    "[THEMA: <Themenname, max 4 Woerter>] — eine NEUE Frage steht im Raum, bei der eine Notiz hilft. Danach: ❓-Zeile + 1-2 ultrakurze Stichpunkte.",
-    "[VERTIEFUNG] — es wird explizit oder implizit weitergehend/genauer zum aktuellen Thema gefragt. Danach: eine Zeile \"↳ <was zusaetzlich gefragt wird, max 8 Woerter>\" + 1-2 Stichpunkte mit AUSSCHLIESSLICH der geforderten neuen Information (nichts wiederholen, nichts Ungefragtes).",
-    "[ERLEDIGT] — die offene Frage wurde von der interviewten Person ausreichend beantwortet, die Einblendung kann weg. Danach nichts weiter.",
-    "[KEINE_AKTION] — nichts Neues und nichts Hilfreiches (Smalltalk, Frage noch offen aber alles bereits vorgeschlagen). Danach nichts weiter.",
+    "Task: classify the current interview situation. Start your output with EXACTLY ONE control line:",
+    "[TOPIC: <topic name, max 4 words>] — a NEW question is on the table where a note helps. Then: ❓ line + 1-2 ultra-short bullet points.",
+    '[FOLLOW_UP] — the interviewer explicitly or implicitly asks deeper/more precisely about the current topic. Then: one line "↳ <what is additionally asked, max 8 words>" + 1-2 bullet points with ONLY the requested new information (repeat nothing, add nothing unrequested).',
+    "[RESOLVED] — the open question has been answered sufficiently by the interviewee; the overlay can go away. Then nothing else.",
+    "[NO_ACTION] — nothing new and nothing helpful (small talk, question still open but everything already suggested). Then nothing else.",
     "",
-    "Wichtig — Stabilitaet hat Vorrang:",
-    "- Ein Thema bleibt aktiv, bis es beantwortet ist. Im Zweifel IMMER [KEINE_AKTION].",
-    "- Wenn der Interviewer seine Frage gerade noch formuliert oder praezisiert (unvollstaendiger Satz, \"also, ich meine ...\", Umformulierung mitten im Gedanken): [KEINE_AKTION] — warte auf die fertige Frage, statt eine womoeglich falsche Antwort zu liefern.",
-    "- Wurde die Frage NACH deiner letzten Notiz praezisiert, sodass deine Notiz nicht mehr passt: [VERTIEFUNG] mit erster Zeile \"↳ Praezisiert: <neue Lesart>\" und der korrigierten Kurzantwort.",
-    "- [VERTIEFUNG] NUR, wenn der Interviewer tatsaechlich eine neue Nachfrage oder Erweiterung gestellt hat — NIEMALS, um von dir aus weitere Ideen nachzuschieben, und niemals waehrend die interviewte Person gerade antwortet.",
-    "- [THEMA: ...] NUR bei einem echten, kompletten Themenwechsel durch den Interviewer.",
-    "- Der Themenname ist IMMER das inhaltliche Interview-Thema aus dem Gespraech (z. B. \"Kubernetes-Erfahrung\", \"Gehaltsvorstellung\", \"Konfliktverhalten\") — NIEMALS Meta-Begriffe wie \"Companion\", \"Check\", \"Analyse\" oder \"Notiz\".",
-    "- Wenn das Thema dasselbe ist wie das aktuelle Interview-Thema oben: verwende NIE erneut [THEMA: ...] — sondern [VERTIEFUNG], [KEINE_AKTION] oder [ERLEDIGT].",
-    "- Gib nie zweimal denselben Vorschlag aus.",
+    "Important — stability comes first:",
+    "- A topic stays active until it is answered. When in doubt, ALWAYS [NO_ACTION].",
+    '- If the interviewer is still formulating or refining their question (incomplete sentence, "well, what I mean is ...", rephrasing mid-thought): [NO_ACTION] — wait for the finished question instead of delivering a possibly wrong answer.',
+    '- If the question was refined AFTER your last note so that your note no longer fits: [FOLLOW_UP] with the first line "↳ Clarified: <new reading>" and the corrected short answer.',
+    "- [FOLLOW_UP] ONLY when the interviewer actually asked a new follow-up or extension — NEVER to push additional ideas on your own, and never while the interviewee is currently answering.",
+    "- [TOPIC: ...] ONLY on a real, complete topic change by the interviewer.",
+    '- The topic name is ALWAYS the actual interview topic from the conversation (e.g. "Kubernetes experience", "salary expectations", "conflict handling") — NEVER meta terms like "companion", "check", "analysis" or "note".',
+    "- If the topic is the same as the current interview topic above: NEVER use [TOPIC: ...] again — use [FOLLOW_UP], [NO_ACTION] or [RESOLVED] instead.",
+    "- Never output the same suggestion twice.",
   ]
     .filter(Boolean)
     .join("\n");
@@ -785,7 +785,7 @@ async function generateCompanionNote(history, flow) {
   return runPrediction(model, input, null);
 }
 
-// Steuerzeile der Companion-Antwort auswerten
+// Parse the control line of the companion response
 function parseCompanionResult(raw) {
   const t = (raw || "").trim();
   if (!t) return { action: "none" };
@@ -793,17 +793,17 @@ function parseCompanionResult(raw) {
   const first = (nl === -1 ? t : t.slice(0, nl)).trim();
   const rest = nl === -1 ? "" : t.slice(nl + 1).trim();
 
-  if (/KEINE_AKTION|NO_NOTE/i.test(first)) return { action: "none" };
-  if (/ERLEDIGT/i.test(first)) return { action: "done" };
-  if (/VERTIEFUNG/i.test(first)) return { action: "deep", text: rest || t };
-  const mTopic = first.match(/THEMA:?\s*(.+?)\]?\s*$/i);
-  if (mTopic && /THEMA/i.test(first)) {
+  if (/NO_ACTION|NO_NOTE/i.test(first)) return { action: "none" };
+  if (/RESOLVED/i.test(first)) return { action: "done" };
+  if (/FOLLOW_UP/i.test(first)) return { action: "deep", text: rest || t };
+  const mTopic = first.match(/TOPIC:?\s*(.+?)\]?\s*$/i);
+  if (mTopic && /TOPIC/i.test(first)) {
     let topic = mTopic[1].replace(/[\[\]]/g, "").trim();
-    // Meta-Begriffe sind keine Interview-Themen (Modell hat sich verlaufen)
-    if (/companion|check|analyse|notiz|no.?note|keine/i.test(topic)) topic = null;
+    // meta terms are not interview topics (the model got lost)
+    if (/companion|check|analysis|note|no.?note|action/i.test(topic)) topic = null;
     return { action: "topic", topic, text: rest || t };
   }
-  // keine Steuerzeile erkannt → als normale Notiz behandeln
+  // no control line recognized → treat as a regular note
   return { action: "topic", topic: null, text: t };
 }
 
@@ -816,7 +816,7 @@ function companionDisplay() {
   );
 }
 
-// Kontext der letzten Companion-Einblendung — Basis fuer die Overlay-Buttons
+// Context of the latest companion note — basis for the overlay buttons
 let lastCompanionContext = null;
 
 function showCompanionOverlay(payload) {
@@ -825,7 +825,7 @@ function showCompanionOverlay(payload) {
   const margin = 16;
   const x = display.workArea.x + display.workArea.width - W - margin;
   const y = display.workArea.y + margin;
-  // maximale Hoehe: Fenster waechst mit dem Inhalt, scrollt aber nie
+  // max height: the window grows with its content but never scrolls
   payload.maxHeight = display.workArea.height - margin * 2;
 
   if (!companionWin || companionWin.isDestroyed()) {
@@ -840,7 +840,7 @@ function showCompanionOverlay(payload) {
       skipTaskbar: true,
       resizable: false,
       movable: false,
-      focusable: false, // klaut Meeting-Fenstern nicht den Fokus
+      focusable: false, // never steals focus from meeting windows
       hasShadow: false,
       show: false,
       webPreferences: {
@@ -874,7 +874,7 @@ function hideCompanionOverlay() {
 
 ipcMain.on("companion-hide", hideCompanionOverlay);
 
-// Das Overlay meldet seine Inhalts-Hoehe → Fenster waechst mit (kein Scrollen)
+// The overlay reports its content height → the window grows (no scrolling)
 ipcMain.on("companion-resize", (_e, { height }) => {
   if (!companionWin || companionWin.isDestroyed()) return;
   const display = companionDisplay();
@@ -886,11 +886,11 @@ ipcMain.on("companion-resize", (_e, { height }) => {
   companionWin.setResizable(false);
 });
 
-// Follow-up-Buttons AUF dem Overlay: neuer Block im Overlay + Karte im Panel
+// Follow-up buttons ON the overlay: new block in the overlay + card in panel
 ipcMain.on("companion-followup", (_e, { mode }) => {
   const ctx = lastCompanionContext;
   if (!ctx || !apiKey()) return;
-  const tag = FOLLOWUP_LABELS[mode] || "➕ Mehr dazu";
+  const tag = FOLLOWUP_LABELS[mode] || "➕ More";
   const label = `${tag} — ${ctx.question.slice(0, 60)}`;
   runAnswerTask(
     label,
@@ -898,14 +898,14 @@ ipcMain.on("companion-followup", (_e, { mode }) => {
       const text = await generateFollowUp(mode, ctx.question, ctx.answer, ctx.history, id);
       if (text && text.trim()) {
         showCompanionOverlay({ mode: "append", tag, text: text.trim() });
-        ctx.answer += `\n\n${text.trim()}`; // Kontext fortschreiben
+        ctx.answer += `\n\n${text.trim()}`; // extend the running context
       }
     },
     "followup"
   );
 });
 
-// Themenwechsel, der auf Bestaetigung durch den User wartet
+// Topic change waiting for user confirmation
 let pendingTopic = null;
 
 function applyCompanionTopic(topic, text, history) {
@@ -925,7 +925,7 @@ ipcMain.on("companion-topic-confirm", (_e, { accept }) => {
     applyCompanionTopic(p.topic, p.text, p.history);
     sendToRenderer("companion-topic-accepted", { topic: p.topic, text: p.text });
   }
-  // abgelehnt → aktueller Gespraechsfaden bleibt unveraendert stehen
+  // declined → the current conversation thread stays untouched
 });
 
 ipcMain.handle("companion-check", async (_e, { history, flow }) => {
@@ -944,13 +944,13 @@ ipcMain.handle("companion-check", async (_e, { history, flow }) => {
         res.topic.toLowerCase() === String(flow.topic).toLowerCase();
 
       if (sameTopic) {
-        // gleiches Thema → im Faden anhaengen statt ersetzen
+        // same topic → append to the thread instead of replacing it
         if (lastCompanionContext) lastCompanionContext.answer += `\n\n${res.text}`;
         showCompanionOverlay({ mode: "append", text: res.text });
         return { ...res, action: "deep" };
       }
 
-      // Kompletter Themenwechsel bei laufendem Faden → ggf. erst bestaetigen
+      // complete topic change while a thread is active → confirm first
       if (settings.topicConfirm && flow?.topic && res.topic) {
         pendingTopic = { topic: res.topic, text: res.text, history };
         showCompanionOverlay({ mode: "confirm", topic: res.topic });
@@ -960,8 +960,8 @@ ipcMain.handle("companion-check", async (_e, { history, flow }) => {
       applyCompanionTopic(res.topic, res.text, history);
     } else if (res.action === "deep") {
       if (lastCompanionContext) lastCompanionContext.answer += `\n\n${res.text}`;
-      else lastCompanionContext = { question: flow?.topic || "Vertiefung", answer: res.text, history };
-      showCompanionOverlay({ mode: "append", tag: "↳ Vertiefung", text: res.text });
+      else lastCompanionContext = { question: flow?.topic || "Follow-up", answer: res.text, history };
+      showCompanionOverlay({ mode: "append", tag: "↳ Follow-up", text: res.text });
     }
     return res;
   } catch (err) {
@@ -975,17 +975,17 @@ ipcMain.handle("list-displays", () => {
     id: d.id,
     label:
       `${d.label || `Display ${i + 1}`} — ${d.bounds.width}x${d.bounds.height}` +
-      (d.id === primaryId ? " (Haupt)" : ""),
+      (d.id === primaryId ? " (primary)" : ""),
   }));
 });
 
 // ---------------------------------------------------------------------------
-// Screenshot-Analyse (Vision-Modell)
+// Screen analysis (vision model)
 // ---------------------------------------------------------------------------
 
 async function captureRegionImage() {
   const r = settings.captureRegion;
-  if (!r) throw new Error("Kein Bildschirmbereich festgelegt");
+  if (!r) throw new Error("No screen region defined");
 
   const display =
     screen.getAllDisplays().find((d) => d.id === r.displayId) ||
@@ -1000,7 +1000,7 @@ async function captureRegionImage() {
   });
   const src =
     sources.find((s) => s.display_id === String(display.id)) || sources[0];
-  if (!src) throw new Error("Bildschirmquelle nicht gefunden");
+  if (!src) throw new Error("Screen source not found");
 
   const size = src.thumbnail.getSize();
   const sx = size.width / display.bounds.width;
@@ -1020,7 +1020,7 @@ async function analyzeScreen(history, answerId) {
   const info = await getModelInfo(model);
   if (!info.imageField) {
     throw new Error(
-      `Modell "${model}" akzeptiert laut Schema keine Bilder. Bitte in den Einstellungen ein Vision-Modell waehlen.`
+      `Model "${model}" does not accept images according to its schema. Please pick a vision model in the settings.`
     );
   }
 
@@ -1038,7 +1038,7 @@ async function analyzeScreen(history, answerId) {
 }
 
 // ---------------------------------------------------------------------------
-// Bereichsauswahl (transparentes Overlay-Fenster)
+// Region selection (transparent overlay window)
 // ---------------------------------------------------------------------------
 
 function selectRegion() {
@@ -1097,7 +1097,7 @@ function selectRegion() {
     };
     ipcMain.on("region-selected", finish);
 
-    // Overlay anderweitig geschlossen → Listener aufraeumen, sauber aufloesen
+    // overlay closed some other way → clean up the listener, resolve cleanly
     overlayWin.on("closed", () => {
       overlayWin = null;
       finish(null, null);
@@ -1106,7 +1106,7 @@ function selectRegion() {
 }
 
 // ---------------------------------------------------------------------------
-// Modell-Listen fuer die Auswahl in den Einstellungen
+// Model lists for the settings dropdowns
 // ---------------------------------------------------------------------------
 
 const FALLBACK_STT_MODELS = [
@@ -1144,7 +1144,7 @@ async function fetchCollectionModels(slug) {
 }
 
 // ---------------------------------------------------------------------------
-// Fenster + IPC
+// Window + IPC
 // ---------------------------------------------------------------------------
 
 function createWindow() {
@@ -1164,7 +1164,7 @@ function createWindow() {
     },
   });
 
-  // System-Audio-Loopback fuer getDisplayMedia (Windows)
+  // system audio loopback for getDisplayMedia (Windows)
   session.defaultSession.setDisplayMediaRequestHandler(
     (request, callback) => {
       desktopCapturer
@@ -1207,7 +1207,7 @@ ipcMain.handle("save-settings", (_e, newSettings) => {
   settings.companionIntervalSec = isFinite(iv) ? Math.min(300, Math.max(5, iv)) : 20;
   persistSettings(settings);
   if (win) win.setAlwaysOnTop(!!settings.alwaysOnTop);
-  modelInfoCache.clear(); // bei Modellwechsel Schemas neu laden
+  modelInfoCache.clear(); // reload schemas after a model change
   return settings;
 });
 
@@ -1218,7 +1218,7 @@ ipcMain.handle("set-always-on-top", (_e, flag) => {
   return settings.alwaysOnTop;
 });
 
-// --- Modell-Listen ---
+// --- Model lists ---
 ipcMain.handle("list-models", async () => {
   const fallback = {
     stt: FALLBACK_STT_MODELS,
@@ -1244,11 +1244,11 @@ ipcMain.handle("list-models", async () => {
   }
 });
 
-// --- Bereichsauswahl ---
+// --- Region selection ---
 ipcMain.handle("select-region", () => selectRegion());
 
 // ---------------------------------------------------------------------------
-// Gespeicherte Gespraeche (conversations.json im userData-Verzeichnis)
+// Saved conversations (conversations.json in the userData directory)
 // ---------------------------------------------------------------------------
 
 function conversationsPath() {
@@ -1295,7 +1295,7 @@ ipcMain.handle("conv-save", (_e, { id, title, transcript, answers }) => {
   } else {
     conv = {
       id: require("crypto").randomUUID(),
-      title: title || `Gespraech vom ${new Date().toLocaleString("de-DE")}`,
+      title: title || `Conversation from ${new Date().toLocaleString("en-GB")}`,
       createdAt: now,
       updatedAt: now,
       transcript,
@@ -1313,13 +1313,13 @@ ipcMain.handle("conv-delete", (_e, id) => {
   return conversationMetas(arr);
 });
 
-// --- Transkription ---
+// --- Transcription ---
 ipcMain.on("transcribe-utterance", (_e, { channel, itemId, pcm }) => {
   if (!apiKey()) {
     sendToRenderer("stt-status", {
       channel,
       status: "error",
-      message: "Kein Replicate API-Key hinterlegt (Einstellungen).",
+      message: "No Replicate API key configured (settings).",
     });
     sendToRenderer("transcript", { channel, itemId, text: "", final: true });
     return;
@@ -1327,7 +1327,7 @@ ipcMain.on("transcribe-utterance", (_e, { channel, itemId, pcm }) => {
   transcribeUtterance(channel, itemId, pcm);
 });
 
-// --- Antworten + Screenshot-Analyse ---
+// --- Answers + screen analysis ---
 let answerCounter = 0;
 
 function runAnswerTask(label, fn, kind = "generic") {
@@ -1339,7 +1339,7 @@ function runAnswerTask(label, fn, kind = "generic") {
       if (!apiKey()) {
         sendToRenderer("answer-delta", {
           id: answerId,
-          text: "[Kein Replicate API-Key hinterlegt]",
+          text: "[No Replicate API key configured]",
         });
       } else {
         await fn(answerId);
@@ -1347,8 +1347,8 @@ function runAnswerTask(label, fn, kind = "generic") {
       }
     } catch (err) {
       const msg = /404/.test(err.message)
-        ? `[Modell wurde auf Replicate nicht gefunden (404). Bitte in den Einstellungen ein gueltiges Modell waehlen.]`
-        : `[Fehler: ${err.message}]`;
+        ? `[Model was not found on Replicate (404). Please pick a valid model in the settings.]`
+        : `[Error: ${err.message}]`;
       sendToRenderer("answer-delta", { id: answerId, text: msg });
     }
     sendToRenderer("answer-done", { id: answerId });
@@ -1366,16 +1366,16 @@ ipcMain.handle("generate-answer", (_e, { question, history, flow }) =>
 );
 
 ipcMain.handle("analyze-screen", (_e, { history }) =>
-  runAnswerTask("📸 Screenshot-Analyse", (id) => analyzeScreen(history, id))
+  runAnswerTask("📸 Screen analysis", (id) => analyzeScreen(history, id))
 );
 
 ipcMain.handle("quick-tip", (_e, { history }) =>
-  runAnswerTask("💡 Schnell-Tipp", (id) => generateQuickTip(history, id))
+  runAnswerTask("💡 Quick tip", (id) => generateQuickTip(history, id))
 );
 
 ipcMain.handle("follow-up", (_e, { mode, question, answer, history }) => {
   const cleanQ = String(question || "").replace(/^❓\s*/, "").slice(0, 60);
-  const label = `${FOLLOWUP_LABELS[mode] || "➕ Mehr dazu"} — ${cleanQ}`;
+  const label = `${FOLLOWUP_LABELS[mode] || "➕ More"} — ${cleanQ}`;
   return runAnswerTask(label, (id) =>
     generateFollowUp(mode, question, answer, history, id)
   );

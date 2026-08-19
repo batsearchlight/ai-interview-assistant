@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta http-equiv="Content-Security-Policy"
@@ -26,7 +26,7 @@
       box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
     }
 
-    /* Haupt-Karte: Thema + Antwort + Aktionen */
+    /* main card: topic + answer + actions */
     #head {
       display: flex;
       align-items: center;
@@ -69,7 +69,7 @@
       word-break: break-word;
     }
 
-    /* Vertiefungs-Popups */
+    /* follow-up popups */
     .pop.deep { border-color: #ffb84f; border-left-color: #ffb84f; }
     .pop.deep .btag {
       display: block;
@@ -81,7 +81,7 @@
       margin-bottom: 4px;
     }
 
-    /* Themenwechsel-Bestaetigung */
+    /* topic change confirmation */
     .pop.confirm {
       display: none;
       align-items: center;
@@ -129,22 +129,22 @@
   <div id="stack">
     <div id="confirmBar" class="pop confirm">
       <span id="confirmText"></span>
-      <button id="btnTopicYes" title="Zum neuen Thema wechseln">Wechseln</button>
-      <button id="btnTopicNo" title="Aktuelles Thema behalten">Behalten</button>
+      <button id="btnTopicYes" title="Switch to the new topic">Switch</button>
+      <button id="btnTopicNo" title="Keep the current topic">Keep</button>
     </div>
 
     <div id="mainPop" class="pop">
       <div id="head">
         <span class="tag">&#129302; Companion</span>
         <span id="topic"></span>
-        <button id="btnClose" title="Einblendung schliessen">&#10005;</button>
+        <button id="btnClose" title="Close the overlay">&#10005;</button>
       </div>
       <div id="mainText" class="ptext"></div>
       <div id="actions">
-        <button data-mode="elaborate" title="Etwas mehr Detail">&#10133; Mehr</button>
-        <button data-mode="code" title="Kleines Code-Beispiel">&lt;/&gt; Code</button>
-        <button data-mode="proscons" title="Pro- und Kontra-Liste">&#9878; Pro/Kontra</button>
-        <button data-mode="examples" title="Konkrete Beispiele">&#129513; Beispiele</button>
+        <button data-mode="elaborate" title="A bit more detail">&#10133; More</button>
+        <button data-mode="code" title="Small code example">&lt;/&gt; Code</button>
+        <button data-mode="proscons" title="Pros and cons list">&#9878; Pros/Cons</button>
+        <button data-mode="examples" title="Concrete examples">&#129513; Examples</button>
       </div>
     </div>
   </div>

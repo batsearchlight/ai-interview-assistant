@@ -78,7 +78,7 @@ button.danger { background: transparent; border-color: var(--red); color: var(--
   cursor: default;
 }
 
-/* ---------- Hinweiszeilen im Transkript ---------- */
+/* ---------- Note lines in the transcript ---------- */
 
 .utterance.note {
   align-self: center;
@@ -89,7 +89,7 @@ button.danger { background: transparent; border-color: var(--red); color: var(--
   max-width: 95%;
 }
 
-/* ---------- Rechtlicher Hinweis ---------- */
+/* ---------- Legal notice ---------- */
 
 #legalContent { display: flex; flex-direction: column; gap: 12px; }
 #legalContent h2 { font-size: 16px; }
@@ -101,7 +101,7 @@ button.danger { background: transparent; border-color: var(--red); color: var(--
   font-weight: 600;
 }
 
-/* ---------- Gespraechs-Leiste ---------- */
+/* ---------- Conversation bar ---------- */
 
 #convbar {
   display: flex;
@@ -162,7 +162,7 @@ section h2 {
   gap: 8px;
 }
 
-/* ---------- Transkript ---------- */
+/* ---------- Transcript ---------- */
 
 .utterance {
   max-width: 88%;
@@ -191,7 +191,7 @@ section h2 {
 .utterance.partial { opacity: 0.55; font-style: italic; }
 .utterance.question { border-color: var(--amber); }
 
-/* ---------- Antworten ---------- */
+/* ---------- Answers ---------- */
 
 .answer {
   background: var(--panel2);
@@ -200,8 +200,8 @@ section h2 {
   border-radius: 8px;
   padding: 10px 12px;
 }
-/* Roh-Transkript der ausloesenden Frage — klein und gedimmt, denn die
-   KI-Antwort beginnt selbst mit der sauber verstandenen ❓-Zeile */
+/* Raw transcript of the triggering question — small and dimmed, since the
+   AI answer itself starts with the cleanly understood ❓ line */
 .answer .q {
   font-size: 11px;
   color: var(--muted);
@@ -289,7 +289,7 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
 
 .hidden { display: none; }
 
-/* ---------- Mermaid-Diagramme in Antworten ---------- */
+/* ---------- Mermaid diagrams in answers ---------- */
 
 .answer .answer-text { white-space: pre-wrap; margin-bottom: 6px; }
 
@@ -308,7 +308,7 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
   white-space: pre-wrap;
 }
 
-/* ---------- Code-Schnipsel (highlight.js) ---------- */
+/* ---------- Code snippets (highlight.js) ---------- */
 
 .code-box {
   background: #0d1117;
@@ -326,7 +326,7 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
   white-space: pre;
 }
 
-/* ---------- Themenverlauf ---------- */
+/* ---------- Topic flow ---------- */
 
 .topic-divider {
   align-self: stretch;
@@ -355,7 +355,7 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
 }
 .answer.deepening .flowtag { color: var(--amber); }
 
-/* ---------- Follow-up-Buttons auf Antwort-Karten ---------- */
+/* ---------- Follow-up buttons on answer cards ---------- */
 
 .answer .actions {
   display: flex;

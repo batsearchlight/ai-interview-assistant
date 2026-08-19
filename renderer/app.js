@@ -9,8 +9,8 @@ let recording = false;
 let audioContexts = [];
 let mediaStreams = [];
 
-// Transkript-Historie fuer den LLM-Kontext
-const history = []; // { speaker: "Interviewer" | "Ich", text }
+// transcript history used as LLM context
+const history = []; // { speaker: "Interviewer" | "Me", text }
 const MAX_HISTORY = 24;
 
 const $ = (id) => document.getElementById(id);
@@ -19,17 +19,17 @@ const transcriptEl = $("transcript");
 const answersEl = $("answers");
 
 // ---------------------------------------------------------------------------
-// Fragenerkennung (Deutsch + Englisch)
+// Question detection (runtime feature: covers German AND English interviews)
 // ---------------------------------------------------------------------------
 
 const QUESTION_STARTS = [
-  // Deutsch
+  // German
   "was ", "wie ", "warum", "wieso", "weshalb", "wann ", "wo ", "wer ",
   "welche", "womit", "wodurch", "wofuer", "wofür", "koennen sie", "können sie",
   "kannst du", "haben sie", "hast du", "erzaehlen sie", "erzählen sie",
   "erzaehl ", "erzähl ", "erklaeren sie", "erklären sie", "erklaer ", "erklär ",
   "beschreiben sie", "beschreib ", "nennen sie", "nenn ",
-  // Englisch
+  // English
   "what ", "how ", "why ", "when ", "where ", "who ", "which ", "can you",
   "could you", "would you", "do you", "did you", "have you", "tell me",
   "describe ", "explain ", "walk me through",
@@ -43,10 +43,10 @@ function looksLikeQuestion(text) {
 }
 
 // ---------------------------------------------------------------------------
-// Transkript-Rendering
+// Transcript rendering
 // ---------------------------------------------------------------------------
 
-// pro (channel, itemId) ein Element; Platzhalter bis das Ergebnis da ist
+// one element per (channel, itemId); placeholder until the result arrives
 const utteranceEls = new Map();
 
 function keyOf(channel, itemId) {
@@ -62,7 +62,7 @@ function renderTranscript({ channel, itemId, text, final }) {
     el.className = `utterance ${channel} partial`;
     const who = document.createElement("span");
     who.className = "who";
-    who.textContent = channel === "other" ? "Interviewer" : "Ich";
+    who.textContent = channel === "other" ? "Interviewer" : "Me";
     const body = document.createElement("span");
     body.className = "body";
     el.append(who, body);
@@ -73,7 +73,7 @@ function renderTranscript({ channel, itemId, text, final }) {
   const body = el.querySelector(".body");
 
   if (final) {
-    // Leere Transkription (Stille/Fehlschlag): Platzhalter entfernen
+    // empty transcription (silence/failure): remove the placeholder
     if (!text.trim()) {
       el.remove();
       utteranceEls.delete(key);
@@ -83,17 +83,17 @@ function renderTranscript({ channel, itemId, text, final }) {
     body.textContent = text;
     el.classList.remove("partial");
 
-    // Historie aus der Anzeige-Reihenfolge neu aufbauen — Transkriptionen
-    // koennen in anderer Reihenfolge fertig werden, als gesprochen wurde.
+    // Rebuild the history from display order — transcriptions can finish
+    // in a different order than they were spoken.
     rebuildHistory();
 
     if (channel === "other") {
       const isQuestion = looksLikeQuestion(text);
       if (isQuestion) el.classList.add("question");
-      // JEDE substanzielle Interviewer-Aussage geht (gebuendelt) zur
-      // KI-Einordnung — [KEINE_AKTION] filtert Nicht-Fragen heraus.
-      // So werden auch Fragen ohne Fragezeichen und in Segmente zerhackte
-      // Fragen erkannt ("So, Angular Directives." / "Erzaehlen Sie mal ...").
+      // EVERY substantial interviewer statement is (batched and) sent for
+      // AI classification — [NO_ACTION] filters out non-questions. This
+      // also catches questions without a question mark and questions that
+      // were chopped into segments ("So, Angular directives." / "Tell me ...").
       queueAutoTrigger(text, isQuestion);
     }
   } else {
@@ -103,24 +103,24 @@ function renderTranscript({ channel, itemId, text, final }) {
   transcriptEl.scrollTop = transcriptEl.scrollHeight;
 }
 
-// LLM-Kontext immer in der Reihenfolge, in der die Aeusserungen im
-// Transkript stehen (= Sprechbeginn), nicht in Fertigstellungs-Reihenfolge
+// Keep the LLM context in the order utterances appear in the transcript
+// (= speech start order), not in completion order
 function rebuildHistory() {
   history.length = 0;
   const els = transcriptEl.querySelectorAll(".utterance:not(.partial):not(.note)");
   for (const el of els) {
-    const speaker = el.classList.contains("other") ? "Interviewer" : "Ich";
+    const speaker = el.classList.contains("other") ? "Interviewer" : "Me";
     const text = el.querySelector(".body")?.textContent || "";
     if (text) history.push({ speaker, text });
   }
   while (history.length > MAX_HISTORY) history.shift();
 }
 
-// Sichtbare Hinweiszeile im Transkript (z. B. bei Transkriptionsfehlern)
+// Visible note line in the transcript (e.g. for transcription errors)
 let lastNote = { text: "", time: 0 };
 function addSystemNote(msg) {
   const now = Date.now();
-  if (msg === lastNote.text && now - lastNote.time < 10000) return; // Spam-Schutz
+  if (msg === lastNote.text && now - lastNote.time < 10000) return; // spam guard
   lastNote = { text: msg, time: now };
   const el = document.createElement("div");
   el.className = "utterance note";
@@ -130,15 +130,15 @@ function addSystemNote(msg) {
 }
 
 // ---------------------------------------------------------------------------
-// Antworten
+// Answers
 // ---------------------------------------------------------------------------
 
 const answerEls = new Map();
 
-// --- Themenverlauf: die KI ordnet jede Interviewer-Aussage per Steuerzeile
-// ein ([THEMA: ...] / [VERTIEFUNG] / [KEINE_AKTION]) — hier der Zustand dazu
+// --- Topic flow: the AI classifies each interviewer statement via a control
+// line ([TOPIC: ...] / [FOLLOW_UP] / [NO_ACTION]) — this is the related state
 let currentTopic = null;
-let topicSuggestions = []; // bisherige Vorschlaege zum aktuellen Thema
+let topicSuggestions = []; // previous suggestions for the current topic
 
 function topicDividerEl(name) {
   const d = document.createElement("div");
@@ -172,35 +172,35 @@ function removeAnswerCard(id, el) {
   answerEls.delete(id);
 }
 
-// Steuerzeile auswerten → "removed" | "handled" | "raw"
+// evaluate the control line → "removed" | "handled" | "raw"
 function applyFlowControl(el, firstLine, id) {
-  const mTopic = firstLine.match(/^\[?THEMA:?\s*(.+?)\]?\s*$/i);
-  if (/KEINE_AKTION/i.test(firstLine)) {
+  const mTopic = firstLine.match(/^\[?TOPIC:?\s*(.+?)\]?\s*$/i);
+  if (/NO_ACTION/i.test(firstLine)) {
     removeAnswerCard(id, el);
     return "removed";
   }
-  if (mTopic && /THEMA/i.test(firstLine)) {
+  if (mTopic && /TOPIC/i.test(firstLine)) {
     const name = mTopic[1].replace(/[\[\]]/g, "").trim();
-    // gleiches Thema erneut gemeldet → kein neuer Marker, als Vertiefung zeigen
+    // same topic reported again → no new marker, show as follow-up
     if (currentTopic && name.toLowerCase() === currentTopic.toLowerCase()) {
       el.classList.add("deepening");
-      addFlowTag(el, `↳ Vertiefung — ${currentTopic}`);
+      addFlowTag(el, `↳ Follow-up — ${currentTopic}`);
       return "handled";
     }
     setTopic(name, el);
-    addFlowTag(el, `📌 Neues Thema: ${currentTopic}`);
+    addFlowTag(el, `📌 New topic: ${currentTopic}`);
     return "handled";
   }
-  if (/VERTIEFUNG/i.test(firstLine)) {
+  if (/FOLLOW_UP/i.test(firstLine)) {
     el.classList.add("deepening");
-    addFlowTag(el, `↳ Vertiefung${currentTopic ? ` — ${currentTopic}` : ""}`);
+    addFlowTag(el, `↳ Follow-up${currentTopic ? ` — ${currentTopic}` : ""}`);
     return "handled";
   }
-  return "raw"; // keine Steuerzeile erkannt → alles anzeigen
+  return "raw"; // no control line recognized → show everything
 }
 
 function askQuestion(question) {
-  // Kontext klein halten (schnellere Antwort), ohne die aktuelle Frage selbst
+  // keep the context small (faster answer), without the current question
   const ctx = history.slice(0, -1).slice(-8);
   api.generateAnswer(question, ctx, {
     topic: currentTopic,
@@ -208,9 +208,9 @@ function askQuestion(question) {
   });
 }
 
-// --- Auto-Trigger: Interviewer-Aeusserungen buendeln und einordnen lassen ---
-// Erkannte Fragen feuern sofort; alles andere nach kurzer Redepause, damit
-// in Segmente zerhackte Aussagen als Ganzes bei der KI ankommen.
+// --- Auto trigger: batch interviewer statements and let the AI classify ---
+// Detected questions fire immediately; everything else after a short pause
+// in speech so statements chopped into segments reach the AI as one piece.
 
 let pendingOther = [];
 let autoTriggerTimer = null;
@@ -221,9 +221,9 @@ function queueAutoTrigger(text, isQuestion) {
   if (!$("chkCompanion").checked && !$("chkAuto").checked) return;
   pendingOther.push(text);
   clearTimeout(autoTriggerTimer);
-  // Companion Mode: IMMER kurz warten — der Interviewer praezisiert seine
-  // Frage oft noch direkt nach dem Fragezeichen. Die Wartezeit sammelt die
-  // Praezisierung mit ein, statt eine voreilige Antwort einzublenden.
+  // Companion mode: ALWAYS wait briefly — interviewers often refine their
+  // question right after the question mark. The wait window collects the
+  // refinement instead of showing a premature answer.
   if (isQuestion && !$("chkCompanion").checked) {
     fireAutoTrigger();
   } else {
@@ -239,7 +239,7 @@ function fireAutoTrigger() {
   autoTriggerTimer = null;
   const statement = pendingOther.join(" ").trim();
   pendingOther = [];
-  if (statement.length < AUTO_TRIGGER_MIN_CHARS) return; // "Ja.", "Mhm." etc.
+  if (statement.length < AUTO_TRIGGER_MIN_CHARS) return; // "Yes.", "Mhm." etc.
   if ($("chkCompanion").checked) {
     companionTick(true);
   } else if ($("chkAuto").checked) {
@@ -254,7 +254,7 @@ api.onAnswerStart(({ id, question, kind }) => {
   el.querySelector(".q").textContent = `❓ ${question}`;
   el.dataset.question = question;
   el.dataset.kind = kind || "generic";
-  // Antwort-Karten warten erst auf die Steuerzeile der KI
+  // answer cards first wait for the AI's control line
   if (el.dataset.kind === "answer") el.dataset.ctl = "wait";
   answersEl.appendChild(el);
   answerEls.set(id, el);
@@ -269,8 +269,8 @@ api.onAnswerDelta(({ id, text }) => {
     el._buf = (el._buf || "") + text;
     const nl = el._buf.indexOf("\n");
     if (nl === -1) {
-      // KEINE_AKTION kann ohne Zeilenumbruch kommen
-      if (/\[KEINE_AKTION\]/i.test(el._buf)) removeAnswerCard(id, el);
+      // NO_ACTION can arrive without a newline
+      if (/\[NO_ACTION\]/i.test(el._buf)) removeAnswerCard(id, el);
       return;
     }
     const first = el._buf.slice(0, nl).trim();
@@ -290,11 +290,11 @@ api.onAnswerDone(({ id }) => {
   const el = answerEls.get(id);
   if (!el) return;
 
-  // Stream endete, bevor eine Steuerzeile aufgeloest wurde
+  // the stream ended before a control line was resolved
   if (el.dataset.ctl === "wait") {
     const buf = (el._buf || "").trim();
     el.dataset.ctl = "done";
-    if (!buf || /KEINE_AKTION/i.test(buf)) {
+    if (!buf || /NO_ACTION/i.test(buf)) {
       removeAnswerCard(id, el);
       return;
     }
@@ -306,13 +306,13 @@ api.onAnswerDone(({ id }) => {
   }
 
   el.classList.remove("streaming");
-  // Rohtext sichern (Rich-Rendering ersetzt gleich den DOM-Inhalt)
+  // preserve the raw text (rich rendering replaces the DOM content next)
   const a = el.querySelector(".a");
   a.dataset.raw = a.textContent;
   renderRichContent(el);
   addAnswerActions(el);
 
-  // fertige Vorschlaege dem aktuellen Thema zuordnen (fuer die naechste Einordnung)
+  // attach finished suggestions to the current topic (for the next classification)
   if (el.dataset.kind === "answer") {
     topicSuggestions.push(a.dataset.raw);
     if (topicSuggestions.length > 6) topicSuggestions.shift();
@@ -320,14 +320,14 @@ api.onAnswerDone(({ id }) => {
 });
 
 // ---------------------------------------------------------------------------
-// Follow-up-Buttons auf Antwort-Karten
+// Follow-up buttons on answer cards
 // ---------------------------------------------------------------------------
 
 const FOLLOWUP_BUTTONS = [
-  ["elaborate", "➕ Mehr", "Etwas mehr Detail zu dieser Antwort"],
-  ["code", "</> Code", "Kleines Code-Beispiel mit Highlighting"],
-  ["proscons", "⚖ Pro/Kontra", "Kompakte Pro- und Kontra-Liste"],
-  ["examples", "🧩 Beispiele", "2-3 konkrete Beispiele"],
+  ["elaborate", "➕ More", "A bit more detail on this answer"],
+  ["code", "</> Code", "Small code example with highlighting"],
+  ["proscons", "⚖ Pros/Cons", "Compact pros and cons list"],
+  ["examples", "🧩 Examples", "2-3 concrete examples"],
 ];
 
 function addAnswerActions(el) {
@@ -351,7 +351,7 @@ function addAnswerActions(el) {
 }
 
 // ---------------------------------------------------------------------------
-// Mermaid-Rendering (```mermaid Codebloecke in fertigen Antworten)
+// Rich content rendering (fenced code blocks in finished answers)
 // ---------------------------------------------------------------------------
 
 let mermaidReady = false;
@@ -369,14 +369,14 @@ function ensureMermaid() {
   return true;
 }
 
-// Fenced-Code-Bloecke rendern: ```mermaid als Diagramm, alles andere als
-// syntax-gehighlighteter Code-Schnipsel (highlight.js, lokal gebundelt)
+// Render fenced code blocks: ```mermaid as a diagram, everything else as a
+// syntax-highlighted code snippet (highlight.js, bundled locally)
 async function renderRichContent(answerEl) {
   const a = answerEl.querySelector(".a");
   const raw = a.dataset.raw ?? a.textContent;
   if (!raw.includes("```")) return;
 
-  // split mit 2 Capture-Gruppen → [Text, Sprache, Code, Text, Sprache, Code, ...]
+  // split with 2 capture groups → [text, language, code, text, language, code, ...]
   const parts = raw.split(/```([\w+-]*)[ \t]*\n?([\s\S]*?)```/g);
   a.innerHTML = "";
 
@@ -393,7 +393,7 @@ async function renderRichContent(answerEl) {
     } else if (mod === 1) {
       const lang = (parts[i] || "").toLowerCase();
       const code = (parts[i + 1] || "").trim();
-      i++; // Code-Teil mitkonsumieren
+      i++; // also consume the code part
 
       if (lang === "mermaid" && ensureMermaid()) {
         const box = document.createElement("div");
@@ -425,25 +425,21 @@ async function renderRichContent(answerEl) {
 }
 
 // ---------------------------------------------------------------------------
-// Screenshot-Analyse
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
-// Companion Mode: Verlauf periodisch (und bei Fragen) pruefen lassen;
-// hilfreiche Notizen erscheinen als Overlay auf dem gewaehlten Display
+// Companion mode: check the conversation periodically (and on questions);
+// helpful notes appear as an overlay on the selected display
 // ---------------------------------------------------------------------------
 
 let companionTimer = null;
 let companionBusy = false;
 let companionLastOtherCount = 0;
 
-// Nur neue INTERVIEWER-Aeusserungen zaehlen — die eigene Antwort darf keine
-// neuen Einblendungen ausloesen (Stabilitaet des Gespraechsfadens)
+// Only count new INTERVIEWER utterances — the interviewee's own answer must
+// not trigger new notes (stability of the conversation thread)
 function otherUtteranceCount() {
   return history.filter((h) => h.speaker === "Interviewer").length;
 }
 
-// Statische Antwort-Karte (fuer Companion-Ergebnisse, die nicht streamen)
+// Static answer card (for companion results, which do not stream)
 function addStaticAnswerCard(label, text, opts = {}) {
   const el = document.createElement("div");
   el.className = "answer";
@@ -483,31 +479,31 @@ async function companionTick(force) {
       if (res.topic && !sameTopic) {
         setTopic(res.topic);
         addStaticAnswerCard("🤖 Companion", res.text, {
-          flowtag: `📌 Neues Thema: ${res.topic}`,
+          flowtag: `📌 New topic: ${res.topic}`,
         });
       } else {
-        // gleiches/unbenanntes Thema → als normale Notiz ohne neuen Marker
+        // same/unnamed topic → show as a regular note without a new marker
         addStaticAnswerCard("🤖 Companion", res.text, {
           deepening: !!sameTopic,
-          flowtag: sameTopic ? `↳ Vertiefung — ${currentTopic}` : null,
+          flowtag: sameTopic ? `↳ Follow-up — ${currentTopic}` : null,
         });
       }
       topicSuggestions.push(res.text);
     } else if (res && res.action === "deep" && !isDuplicate) {
       addStaticAnswerCard("🤖 Companion", res.text, {
         deepening: true,
-        flowtag: `↳ Vertiefung${currentTopic ? ` — ${currentTopic}` : ""}`,
+        flowtag: `↳ Follow-up${currentTopic ? ` — ${currentTopic}` : ""}`,
       });
       topicSuggestions.push(res.text);
     }
-    // "done" → Overlay ausgeblendet; "none" → nichts;
-    // "pending" → Themenwechsel wartet auf Bestaetigung im Overlay
+    // "done" → overlay hidden; "none" → nothing;
+    // "pending" → topic change waits for confirmation in the overlay
   } catch {}
   companionBusy = false;
 
-  // Hat der Interviewer WAEHREND des Checks weitergesprochen (Frage
-  // praezisiert), sofort mit aktualisiertem Verlauf nachpruefen — die KI
-  // korrigiert dann ggf. per "↳ Praezisiert"-Block.
+  // If the interviewer kept talking DURING the check (refined the question),
+  // re-check immediately with the updated history — the AI then corrects
+  // via a "↳ Clarified" block if needed.
   if (
     recording &&
     $("chkCompanion").checked &&
@@ -517,11 +513,11 @@ async function companionTick(force) {
   }
 }
 
-// Vom User bestaetigter Themenwechsel (Overlay-Button "Wechseln")
+// Topic change confirmed by the user (overlay button "Switch")
 api.onCompanionTopicAccepted(({ topic, text }) => {
   setTopic(topic);
   addStaticAnswerCard("🤖 Companion", text, {
-    flowtag: `📌 Neues Thema: ${topic}`,
+    flowtag: `📌 New topic: ${topic}`,
   });
   topicSuggestions.push(text);
 });
@@ -541,7 +537,7 @@ $("chkCompanion").addEventListener("change", async (e) => {
 });
 
 // ---------------------------------------------------------------------------
-// Schnell-Tipp (nur Gespraechsverlauf, ohne erkannte Frage)
+// Quick tip (conversation history only, no detected question)
 // ---------------------------------------------------------------------------
 
 function requestQuickTip() {
@@ -551,7 +547,7 @@ function requestQuickTip() {
 
 $("btnTip").addEventListener("click", requestQuickTip);
 
-// Strg+T als Schnellzugriff, solange das Fenster fokussiert ist
+// Ctrl+T as a shortcut while the window is focused
 document.addEventListener("keydown", (e) => {
   if (e.ctrlKey && e.key.toLowerCase() === "t") {
     e.preventDefault();
@@ -573,12 +569,12 @@ $("btnShot").addEventListener("click", async () => {
   api.analyzeScreen(history.slice(-14));
 });
 
-// Manuelle Frage
+// manual question
 $("btnAsk").addEventListener("click", () => {
   const input = $("manualQuestion");
   let q = input.value.trim();
   if (!q) {
-    // Letzte Partner-Aussage als Frage verwenden
+    // use the interviewer's most recent statement as the question
     const lastOther = [...history].reverse().find((h) => h.speaker === "Interviewer");
     if (lastOther) q = lastOther.text;
   }
@@ -592,21 +588,21 @@ $("manualQuestion").addEventListener("keydown", (e) => {
 });
 
 // ---------------------------------------------------------------------------
-// Sprach-Segmentierung (einfacher Energie-VAD)
+// Speech segmentation (simple energy-based VAD)
 // ---------------------------------------------------------------------------
-// Der AudioWorklet liefert Int16-Bloecke @16 kHz (2048 Samples = 128 ms).
-// Eine Aeusserung beginnt bei Ueberschreiten der Energie-Schwelle und endet
-// nach SILENCE_END_MS Stille. Fertige Aeusserungen gehen als PCM an den
-// Main-Prozess und werden dort ueber Replicate transkribiert.
+// The AudioWorklet delivers Int16 chunks @16 kHz (2048 samples = 128 ms).
+// An utterance starts when the energy threshold is exceeded and ends after
+// SILENCE_END_MS of silence. Finished utterances are sent as PCM to the
+// main process, which transcribes them via Replicate.
 
 const SAMPLE_RATE = 16000;
-const VAD_THRESHOLD = 450;   // RMS auf Int16
+const VAD_THRESHOLD = 450;   // RMS on Int16
 const SILENCE_END_MS = 600;
 const MIN_SPEECH_MS = 350;
 const PREROLL_CHUNKS = 3;
 
-// Bei langem Sprechen wird alle N Sekunden ein Segment abgeschnitten und
-// sofort transkribiert (konfigurierbar in den Einstellungen)
+// During long speech a segment is cut off every N seconds and transcribed
+// immediately (configurable in the settings)
 function maxSegmentMs() {
   const sec = parseFloat(settings?.maxSegmentSec);
   return (isFinite(sec) && sec >= 0.5 ? sec : 1) * 1000;
@@ -627,7 +623,7 @@ class UtteranceSegmenter {
     this.silenceMs = 0;
     this.speechMs = 0;
     this.currentId = null;
-    this.isContinuation = false; // Segment ist Fortsetzung eines langen Beitrags
+    this.isContinuation = false; // segment continues a long statement
   }
 
   push(int16) {
@@ -644,14 +640,14 @@ class UtteranceSegmenter {
         this.speechMs = ms;
         this.silenceMs = 0;
         this.isContinuation = false;
-        // Platzhalter SOFORT bei Sprechbeginn einfuegen — so bleibt die
-        // Reihenfolge im Transkript die Sprech-Reihenfolge, auch wenn
-        // Transkriptionen unterschiedlich lange brauchen.
+        // Insert the placeholder IMMEDIATELY at speech start — that keeps
+        // the transcript in speaking order even when transcriptions take
+        // different amounts of time.
         this.currentId = crypto.randomUUID();
         renderTranscript({
           channel: this.channel,
           itemId: this.currentId,
-          text: "🎙 spricht …",
+          text: "🎙 speaking …",
           final: false,
         });
       }
@@ -670,14 +666,14 @@ class UtteranceSegmenter {
       }
     }
 
-    // Langer Redebeitrag: Segment abschneiden und sofort transkribieren,
-    // waehrend der Sprecher weiterredet (naechstes Segment laeuft weiter)
+    // Long statement: cut off a segment and transcribe it immediately
+    // while the speaker keeps talking (the next segment continues)
     const totalMs =
       (this.chunks.reduce((a, c) => a + c.length, 0) / SAMPLE_RATE) * 1000;
     if (totalMs >= maxSegmentMs()) this.rollover();
   }
 
-  // Segment abschliessen, aber im Sprech-Modus bleiben
+  // finish the segment but stay in speaking mode
   rollover() {
     const chunks = this.chunks;
     const itemId = this.currentId;
@@ -689,7 +685,7 @@ class UtteranceSegmenter {
     renderTranscript({
       channel: this.channel,
       itemId: this.currentId,
-      text: "🎙 spricht …",
+      text: "🎙 speaking …",
       final: false,
     });
 
@@ -710,10 +706,10 @@ class UtteranceSegmenter {
 
     if (!itemId) return;
 
-    // Fortsetzungs-Segmente nie verwerfen — sie enthalten das Ende eines
-    // laengeren Beitrags, auch wenn der Sprachanteil im Segment kurz ist
+    // Never discard continuation segments — they contain the end of a
+    // longer statement even if their speech portion is short
     if (!wasContinuation && speechMs < MIN_SPEECH_MS) {
-      // zu kurz — vermutlich Geraeusch: Platzhalter wieder entfernen
+      // too short — probably noise: remove the placeholder again
       renderTranscript({ channel: this.channel, itemId, text: "", final: true });
       return;
     }
@@ -737,7 +733,7 @@ class UtteranceSegmenter {
     renderTranscript({
       channel: this.channel,
       itemId,
-      text: "… transkribiere …",
+      text: "… transcribing …",
       final: false,
     });
     api.transcribeUtterance(this.channel, itemId, new Uint8Array(merged.buffer));
@@ -750,7 +746,7 @@ const segmenters = {
 };
 
 // ---------------------------------------------------------------------------
-// Audio-Aufnahme (Mikrofon + System-Loopback)
+// Audio capture (microphone + system loopback)
 // ---------------------------------------------------------------------------
 
 async function setupPipeline(stream, channel) {
@@ -777,20 +773,20 @@ async function startRecording() {
     return;
   }
   if (!settings.replicateApiKey && !settings.hasEnvKey) {
-    alert("Bitte zuerst den Replicate API-Key in den Einstellungen hinterlegen.");
+    alert("Please add your Replicate API key in the settings first.");
     openSettings();
     return;
   }
 
   try {
-    // System-Audio (Loopback) — Stimme der Gespraechspartner
+    // system audio (loopback) — the other participants' voices
     const sysStream = await navigator.mediaDevices.getDisplayMedia({
       video: true,
       audio: true,
     });
     sysStream.getVideoTracks().forEach((t) => t.stop());
 
-    // Mikrofon — eigene Stimme
+    // microphone — the interviewee's own voice
     const micStream = await navigator.mediaDevices.getUserMedia({
       audio: {
         echoCancellation: true,
@@ -807,11 +803,11 @@ async function startRecording() {
     $("btnStop").disabled = false;
     $("dotMe").className = "dot connected";
     $("dotOther").className = "dot connected";
-    refreshConvBar(); // Gespraechs-Verwaltung waehrend der Aufnahme sperren
+    refreshConvBar(); // lock conversation management while recording
     companionLastOtherCount = otherUtteranceCount();
     updateCompanionTimer();
   } catch (err) {
-    alert("Audio-Aufnahme fehlgeschlagen: " + err.message);
+    alert("Audio capture failed: " + err.message);
   }
 }
 
@@ -835,14 +831,14 @@ async function stopRecording() {
   $("dotOther").className = "dot";
   refreshConvBar();
   updateCompanionTimer();
-  api.hideCompanionOverlay(); // Interview vorbei → Einblendung schliessen
+  api.hideCompanionOverlay(); // interview over → close the overlay
 }
 
 $("btnStart").addEventListener("click", startRecording);
 $("btnStop").addEventListener("click", stopRecording);
 
 // ---------------------------------------------------------------------------
-// Status + Events
+// Status + events
 // ---------------------------------------------------------------------------
 
 api.onTranscript(renderTranscript);
@@ -853,7 +849,7 @@ api.onSttStatus(({ channel, status, message }) => {
     dot.className = "dot error";
     if (message) {
       console.error(`STT [${channel}]:`, message);
-      addSystemNote(`Transkription fehlgeschlagen: ${message}`);
+      addSystemNote(`Transcription failed: ${message}`);
     }
     setTimeout(() => {
       if (recording) dot.className = "dot connected";
@@ -862,7 +858,7 @@ api.onSttStatus(({ channel, status, message }) => {
 });
 
 // ---------------------------------------------------------------------------
-// Gespraechs-Verwaltung: speichern, blaettern, loeschen (nur ohne Aufnahme)
+// Conversation management: save, browse, delete (only while not recording)
 // ---------------------------------------------------------------------------
 
 let convMetas = [];
@@ -926,7 +922,7 @@ function restoreConversation(conv) {
     el.className = `utterance ${u.channel}${u.question ? " question" : ""}`;
     const who = document.createElement("span");
     who.className = "who";
-    who.textContent = u.channel === "other" ? "Interviewer" : "Ich";
+    who.textContent = u.channel === "other" ? "Interviewer" : "Me";
     const body = document.createElement("span");
     body.className = "body";
     body.textContent = u.text;
@@ -941,11 +937,11 @@ function restoreConversation(conv) {
     const el = document.createElement("div");
     el.className = "answer";
     el.innerHTML = `<div class="q"></div><div class="a"></div>`;
-    el.querySelector(".q").textContent = a.question; // enthaelt bereits das ❓-Praefix
+    el.querySelector(".q").textContent = a.question; // already carries the ❓ prefix
     el.dataset.question = (a.question || "").replace(/^❓\s*/, "");
     if (a.deepening) {
       el.classList.add("deepening");
-      addFlowTag(el, "↳ Vertiefung");
+      addFlowTag(el, "↳ Follow-up");
     }
     const aEl = el.querySelector(".a");
     aEl.textContent = a.text;
@@ -968,14 +964,14 @@ function refreshConvBar() {
   const label = $("convLabel");
   if (currentConvId && idx !== -1) {
     const m = convMetas[idx];
-    const when = new Date(m.updatedAt).toLocaleString("de-DE", {
+    const when = new Date(m.updatedAt).toLocaleString("en-GB", {
       day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
     });
     label.textContent = `${idx + 1}/${convMetas.length} — ${m.title} (${when})`;
   } else {
     label.textContent = convMetas.length
-      ? `ungespeichertes Gespraech — ${convMetas.length} gespeichert`
-      : "ungespeichertes Gespraech";
+      ? `unsaved conversation — ${convMetas.length} saved`
+      : "unsaved conversation";
   }
 
   $("btnConvSave").disabled = recording;
@@ -988,7 +984,7 @@ function refreshConvBar() {
 function conversationTitle() {
   const firstOther = history.find((h) => h.speaker === "Interviewer");
   const src = (firstOther || history[0])?.text || "";
-  return src ? src.slice(0, 48) : `Gespraech vom ${new Date().toLocaleString("de-DE")}`;
+  return src ? src.slice(0, 48) : `Conversation from ${new Date().toLocaleString("en-GB")}`;
 }
 
 async function saveConversation() {
@@ -1018,7 +1014,7 @@ async function loadConversationAt(idx) {
 
 function navConversation(delta) {
   const idx = convIndex();
-  // aus einem ungespeicherten Gespraech heraus: beim neuesten anfangen
+  // starting from an unsaved conversation: begin at the newest one
   loadConversationAt(idx === -1 ? (delta > 0 ? 0 : convMetas.length - 1) : idx + delta);
 }
 
@@ -1036,7 +1032,7 @@ $("btnConvNext").addEventListener("click", () => navConversation(1));
 
 $("btnConvDelete").addEventListener("click", async () => {
   if (recording || !currentConvId) return;
-  if (!confirm("Dieses Gespraech endgueltig loeschen?")) return;
+  if (!confirm("Delete this conversation permanently?")) return;
   const deletedIdx = convIndex();
   convMetas = await api.convDelete(currentConvId);
   currentConvId = null;
@@ -1049,18 +1045,18 @@ $("btnConvDelete").addEventListener("click", async () => {
 });
 
 // ---------------------------------------------------------------------------
-// Kosten-Anzeige (Schaetzung, kommt vom Main-Prozess)
+// Cost display (estimate, provided by the main process)
 // ---------------------------------------------------------------------------
 
 api.onUsage(({ totalUsd, runs, unknownRuns }) => {
   $("cost").textContent = `≈ $${totalUsd.toFixed(4)}`;
   $("cost").title =
-    `Geschaetzte KI-Kosten dieser Session — ${runs} Aufrufe` +
-    (unknownRuns ? ` (davon ${unknownRuns} ohne Preisdaten)` : "");
+    `Estimated AI cost this session — ${runs} calls` +
+    (unknownRuns ? ` (${unknownRuns} without pricing data)` : "");
 });
 
 // ---------------------------------------------------------------------------
-// Rechtlicher Hinweis
+// Legal notice
 // ---------------------------------------------------------------------------
 
 function openLegal() {
@@ -1079,33 +1075,33 @@ $("btnLegalDecline").addEventListener("click", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Einstellungen inkl. Modell-Auswahl
+// Settings including model selection
 // ---------------------------------------------------------------------------
 
 const RECOMMENDED_STT = [
-  ["openai/gpt-4o-transcribe", "beste Genauigkeit"],
-  ["vaibhavs10/incredibly-fast-whisper", "am schnellsten"],
-  ["victor-upmeet/whisperx", "mit Sprecher-Labels"],
-  ["openai/gpt-4o-mini-transcribe", "guenstig + gut"],
+  ["openai/gpt-4o-transcribe", "best accuracy"],
+  ["vaibhavs10/incredibly-fast-whisper", "fastest"],
+  ["victor-upmeet/whisperx", "with speaker labels"],
+  ["openai/gpt-4o-mini-transcribe", "cheap + good"],
 ];
 
 const RECOMMENDED_LLM = [
-  ["anthropic/claude-4.5-haiku", "schnell, empfohlen"],
-  ["anthropic/claude-4.5-sonnet", "beste Qualitaet"],
-  ["openai/gpt-5-mini", "schnell"],
-  ["google/gemini-2.5-flash", "schnell"],
+  ["anthropic/claude-4.5-haiku", "fast, recommended"],
+  ["anthropic/claude-4.5-sonnet", "best quality"],
+  ["openai/gpt-5-mini", "fast"],
+  ["google/gemini-2.5-flash", "fast"],
 ];
 
 const RECOMMENDED_VISION = [
-  ["google/gemini-3-flash", "am schnellsten, empfohlen"],
-  ["anthropic/claude-4.5-sonnet", "beste Tiefe (UI, Code, Diagramme)"],
-  ["openai/gpt-5.4", "am faehigsten"],
-  ["openai/gpt-5", "Allrounder"],
-  ["openai/gpt-4o-mini", "guenstig"],
-  ["lucataco/moondream2", "Open Source"],
+  ["google/gemini-3-flash", "fastest, recommended"],
+  ["anthropic/claude-4.5-sonnet", "best depth (UI, code, diagrams)"],
+  ["openai/gpt-5.4", "most capable"],
+  ["openai/gpt-5", "all-rounder"],
+  ["openai/gpt-4o-mini", "cheap"],
+  ["lucataco/moondream2", "open source"],
 ];
 
-// zuletzt geladene Collection-Listen (Fallback bis zum ersten Live-Abruf)
+// most recently loaded collection lists (fallback until the first live fetch)
 let modelLists = { stt: [], llm: [], vision: [] };
 
 const CUSTOM_VALUE = "__custom__";
@@ -1116,7 +1112,7 @@ function populateModelSelect(selectId, customId, recommended, all, current) {
   const seen = new Set();
 
   const gRec = document.createElement("optgroup");
-  gRec.label = "Empfohlen";
+  gRec.label = "Recommended";
   for (const [m, hint] of recommended) {
     if (seen.has(m)) continue;
     seen.add(m);
@@ -1127,7 +1123,7 @@ function populateModelSelect(selectId, customId, recommended, all, current) {
   const rest = (all || []).filter((m) => !seen.has(m));
   if (rest.length) {
     const gAll = document.createElement("optgroup");
-    gAll.label = "Alle Modelle";
+    gAll.label = "All models";
     for (const m of rest) {
       seen.add(m);
       gAll.appendChild(new Option(m, m));
@@ -1135,13 +1131,13 @@ function populateModelSelect(selectId, customId, recommended, all, current) {
     sel.appendChild(gAll);
   }
 
-  // gespeichertes Modell, das (noch) nicht in den Listen steht
+  // a saved model that is not (yet) part of the lists
   if (current && !seen.has(current)) {
-    sel.insertBefore(new Option(`${current} (gespeichert)`, current), sel.firstChild);
+    sel.insertBefore(new Option(`${current} (saved)`, current), sel.firstChild);
     seen.add(current);
   }
 
-  sel.appendChild(new Option("Eigenes Modell eingeben …", CUSTOM_VALUE));
+  sel.appendChild(new Option("Enter custom model …", CUSTOM_VALUE));
 
   sel.value = current && seen.has(current) ? current : sel.options[0].value;
   $(customId).classList.toggle("hidden", sel.value !== CUSTOM_VALUE);
@@ -1172,20 +1168,20 @@ function refreshModelSelects() {
 
 async function loadModelLists() {
   $("btnLoadModels").disabled = true;
-  $("btnLoadModels").textContent = "lade ...";
+  $("btnLoadModels").textContent = "loading ...";
   try {
     const { stt, llm, vision, live } = await api.listModels();
     modelLists = { stt, llm, vision };
     refreshModelSelects();
     $("btnLoadModels").textContent = live
-      ? "Modelle geladen ✓"
-      : "Standard-Liste (Key pruefen)";
+      ? "Models loaded ✓"
+      : "Default list (check API key)";
   } catch {
-    $("btnLoadModels").textContent = "Fehler beim Laden";
+    $("btnLoadModels").textContent = "Loading failed";
   } finally {
     $("btnLoadModels").disabled = false;
     setTimeout(() => {
-      $("btnLoadModels").textContent = "Modell-Liste von Replicate aktualisieren";
+      $("btnLoadModels").textContent = "Refresh model list from Replicate";
     }, 2500);
   }
 }
@@ -1193,10 +1189,10 @@ async function loadModelLists() {
 function openSettings() {
   $("setReplicate").value = settings.replicateApiKey || "";
   $("setReplicate").placeholder = settings.hasEnvKey
-    ? "r8_... (leer = REPLICATE_API_TOKEN aus Umgebung)"
+    ? "r8_... (empty = REPLICATE_API_TOKEN from environment)"
     : "r8_...";
   refreshModelSelects();
-  $("setLanguage").value = settings.language ?? "de";
+  $("setLanguage").value = settings.language ?? "en";
   $("setSegment").value = settings.maxSegmentSec ?? 1;
   $("setCompanionInterval").value = settings.companionIntervalSec ?? 20;
   $("setTopicConfirm").checked = !!settings.topicConfirm;
@@ -1256,14 +1252,14 @@ $("chkAuto").addEventListener("change", async (e) => {
   $("chkPin").checked = !!settings.alwaysOnTop;
   $("chkCompanion").checked = !!settings.companionMode;
 
-  // Auswahllisten laden (live von Replicate, sonst Standard-Liste)
+  // load the model lists (live from Replicate, otherwise the default list)
   try {
     const { stt, llm, vision } = await api.listModels();
     modelLists = { stt, llm, vision };
   } catch {}
   refreshModelSelects();
 
-  // gespeicherte Gespraeche auflisten
+  // list saved conversations
   try {
     convMetas = await api.convList();
   } catch {}

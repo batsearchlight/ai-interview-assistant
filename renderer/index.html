@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta http-equiv="Content-Security-Policy"
@@ -11,157 +11,157 @@
 <body>
   <header id="topbar">
     <div class="left">
-      <button id="btnStart" class="primary">&#9679; Aufnahme starten</button>
-      <button id="btnStop" class="danger" disabled>&#9632; Stopp</button>
-      <button id="btnTip" title="Schnellen Tipp/Antwort nur aus dem Gespraechsverlauf holen (Strg+T)">&#128161; Tipp</button>
-      <button id="btnShot" title="Festgelegten Bildschirmbereich analysieren">&#128248; Analyse</button>
-      <button id="btnRegion" title="Bildschirmbereich fuer die Analyse festlegen">&#9974; Bereich</button>
+      <button id="btnStart" class="primary">&#9679; Start recording</button>
+      <button id="btnStop" class="danger" disabled>&#9632; Stop</button>
+      <button id="btnTip" title="Get a quick tip/answer from the conversation history only (Ctrl+T)">&#128161; Tip</button>
+      <button id="btnShot" title="Analyze the selected screen region">&#128248; Analyze</button>
+      <button id="btnRegion" title="Define the screen region for analysis">&#9974; Region</button>
       <span class="status">
-        <span id="dotOther" class="dot" title="System-Audio (Gespraechspartner)"></span> Partner
-        <span id="dotMe" class="dot" title="Mikrofon (eigene Stimme)"></span> Ich
+        <span id="dotOther" class="dot" title="System audio (other participants)"></span> Partner
+        <span id="dotMe" class="dot" title="Microphone (your own voice)"></span> Me
       </span>
     </div>
     <div class="right">
-      <span id="cost" title="Geschaetzte KI-Kosten dieser Session">&asymp; $0.0000</span>
-      <label class="toggle" title="Companion Mode: prueft den Verlauf automatisch und blendet hilfreiche Notizen als Overlay ein">
+      <span id="cost" title="Estimated AI cost this session">&asymp; $0.0000</span>
+      <label class="toggle" title="Companion mode: checks the conversation automatically and shows helpful notes as an overlay">
         <input type="checkbox" id="chkCompanion" /> &#129302; Companion
       </label>
-      <label class="toggle" title="Fragen automatisch erkennen und beantworten">
-        <input type="checkbox" id="chkAuto" checked /> Auto-Antwort
+      <label class="toggle" title="Detect and answer questions automatically">
+        <input type="checkbox" id="chkAuto" checked /> Auto answer
       </label>
-      <label class="toggle" title="Fenster immer im Vordergrund">
+      <label class="toggle" title="Keep the window always on top">
         <input type="checkbox" id="chkPin" checked /> &#128204; Pin
       </label>
-      <button id="btnLegal" title="Rechtlicher Hinweis">&sect;</button>
-      <button id="btnSettings" title="Einstellungen">&#9881;</button>
+      <button id="btnLegal" title="Legal notice">&sect;</button>
+      <button id="btnSettings" title="Settings">&#9881;</button>
     </div>
   </header>
 
   <div id="convbar">
-    <button id="btnConvSave" title="Aktuelles Gespraech speichern">&#128190; Speichern</button>
-    <button id="btnConvNew" title="Neues, leeres Gespraech beginnen">&#10010; Neu</button>
+    <button id="btnConvSave" title="Save the current conversation">&#128190; Save</button>
+    <button id="btnConvNew" title="Start a new, empty conversation">&#10010; New</button>
     <span class="spacer"></span>
-    <button id="btnConvPrev" title="Vorheriges gespeichertes Gespraech">&#9664;</button>
-    <span id="convLabel">ungespeichertes Gespraech</span>
-    <button id="btnConvNext" title="Naechstes gespeichertes Gespraech">&#9654;</button>
+    <button id="btnConvPrev" title="Previous saved conversation">&#9664;</button>
+    <span id="convLabel">unsaved conversation</span>
+    <button id="btnConvNext" title="Next saved conversation">&#9654;</button>
     <span class="spacer"></span>
-    <button id="btnConvDelete" class="danger" title="Angezeigtes Gespraech loeschen">&#128465; Loeschen</button>
+    <button id="btnConvDelete" class="danger" title="Delete the displayed conversation">&#128465; Delete</button>
   </div>
 
   <main id="content">
     <section id="transcriptPane">
-      <h2>Gespraechsverlauf</h2>
+      <h2>Conversation</h2>
       <div id="transcript"></div>
     </section>
 
     <section id="answerPane">
-      <h2>KI-Antwortvorschlaege</h2>
+      <h2>AI answer suggestions</h2>
       <div id="answers"></div>
       <div id="manualAsk">
         <input id="manualQuestion" type="text"
-               placeholder="Frage manuell eingeben oder letzte Partner-Aussage nutzen ..." />
-        <button id="btnAsk" class="primary">Antwort</button>
+               placeholder="Type a question manually or reuse the interviewer's last statement ..." />
+        <button id="btnAsk" class="primary">Answer</button>
       </div>
     </section>
   </main>
 
-  <!-- Einstellungen -->
+  <!-- Settings -->
   <dialog id="settingsDialog">
     <form method="dialog" id="settingsForm">
-      <h2>Einstellungen</h2>
+      <h2>Settings</h2>
 
-      <label>Replicate API-Key
+      <label>Replicate API key
         <input type="password" id="setReplicate" placeholder="r8_..." />
       </label>
 
-      <button type="button" id="btnLoadModels">Modell-Liste von Replicate aktualisieren</button>
+      <button type="button" id="btnLoadModels">Refresh model list from Replicate</button>
 
-      <label>Transkriptions-Modell (Speech-to-Text)
+      <label>Transcription model (speech-to-text)
         <select id="setSttModel"></select>
         <input type="text" id="setSttCustom" class="hidden"
-               placeholder="owner/name, z.B. openai/whisper" />
+               placeholder="owner/name, e.g. openai/whisper" />
       </label>
 
-      <label>Antwort-Modell (LLM)
+      <label>Answer model (LLM)
         <select id="setAnswerModel"></select>
         <input type="text" id="setAnswerCustom" class="hidden"
-               placeholder="owner/name, z.B. anthropic/claude-4.5-haiku" />
+               placeholder="owner/name, e.g. anthropic/claude-4.5-haiku" />
       </label>
 
-      <label>Vision-Modell (Screenshot-Analyse)
+      <label>Vision model (screen analysis)
         <select id="setVisionModel"></select>
         <input type="text" id="setVisionCustom" class="hidden"
-               placeholder="owner/name, z.B. google/gemini-3-flash" />
+               placeholder="owner/name, e.g. google/gemini-3-flash" />
       </label>
 
-      <label>Sprache des Interviews
+      <label>Interview language
         <select id="setLanguage">
-          <option value="de">Deutsch</option>
-          <option value="en">Englisch (English)</option>
+          <option value="en">English</option>
+          <option value="de">German (Deutsch)</option>
           <option value="hi">Hindi (&#2361;&#2367;&#2344;&#2381;&#2342;&#2368;)</option>
-          <option value="zh">Chinesisch (&#20013;&#25991;)</option>
-          <option value="ja">Japanisch (&#26085;&#26412;&#35486;)</option>
-          <option value="es">Spanisch (Espa&ntilde;ol)</option>
-          <option value="fr">Franzoesisch (Fran&ccedil;ais)</option>
-          <option value="">Automatisch erkennen</option>
+          <option value="zh">Chinese (&#20013;&#25991;)</option>
+          <option value="ja">Japanese (&#26085;&#26412;&#35486;)</option>
+          <option value="es">Spanish (Espa&ntilde;ol)</option>
+          <option value="fr">French (Fran&ccedil;ais)</option>
+          <option value="">Detect automatically</option>
         </select>
       </label>
 
-      <label>Segmentlaenge bei langem Sprechen (Sekunden)
+      <label>Segment length for long speech (seconds)
         <input type="number" id="setSegment" min="0.5" max="30" step="0.5" />
-        <small class="hint">Lange Redebeitraege werden alle N Sekunden zerteilt und
-        sofort transkribiert. Kleiner = schneller sichtbar, groesser = genauer.</small>
+        <small class="hint">Long statements are split every N seconds and
+        transcribed immediately. Smaller = visible sooner, larger = more accurate.</small>
       </label>
 
-      <label>Companion: Pruef-Intervall (Sekunden)
+      <label>Companion: check interval (seconds)
         <input type="number" id="setCompanionInterval" min="5" max="300" step="5" />
-        <small class="hint">Im Companion Mode prueft die KI den Verlauf in diesem
-        Intervall (und sofort bei erkannten Fragen) und blendet nur dann eine
-        Notiz ein, wenn sie wirklich hilft.</small>
+        <small class="hint">In companion mode the AI checks the conversation at
+        this interval (and immediately on detected questions) and only shows a
+        note when it genuinely helps.</small>
       </label>
 
-      <label>Companion: Display fuer die Einblendung
+      <label>Companion: display for the overlay
         <select id="setCompanionDisplay"></select>
       </label>
 
       <label class="checkRow">
         <input type="checkbox" id="setTopicConfirm" />
-        Companion: Themenwechsel erst nach Bestaetigung
-        <small class="hint">Bei einem komplett neuen Thema bleibt der aktuelle
-        Gespraechsfaden stehen, bis du im Overlay auf "Wechseln" klickst —
-        nichts wird ueberschrieben, waehrend du gerade mit den Tipps antwortest.</small>
+        Companion: confirm topic changes
+        <small class="hint">On a completely new topic the current conversation
+        thread stays visible until you click "Switch" in the overlay — nothing
+        gets overwritten while you are still answering with the tips.</small>
       </label>
 
-      <label>Eigenes Profil / Kontext (fliesst in die Antworten ein)
+      <label>Your profile / context (used in every answer)
         <textarea id="setProfile" rows="4"
-          placeholder="z.B. Rolle, auf die du dich bewirbst, Kern-Skills, wichtige Projekte ..."></textarea>
+          placeholder="e.g. the role you are applying for, core skills, key projects ..."></textarea>
       </label>
 
       <div class="dialogButtons">
-        <button value="cancel">Abbrechen</button>
-        <button value="save" id="btnSaveSettings" class="primary">Speichern</button>
+        <button value="cancel">Cancel</button>
+        <button value="save" id="btnSaveSettings" class="primary">Save</button>
       </div>
     </form>
   </dialog>
 
-  <!-- Rechtlicher Hinweis -->
+  <!-- Legal notice -->
   <dialog id="legalDialog">
     <div id="legalContent">
-      <h2>&sect; Rechtlicher Hinweis</h2>
-      <p>Diese App nimmt Gespraeche auf (Mikrofon + System-Audio), transkribiert sie
-         und sendet Audio, Transkripte und ggf. Bildschirmfotos zur Verarbeitung an
-         externe KI-Dienste (Replicate).</p>
-      <p class="legalStrong">Die Nutzung ist nur zulaessig, wenn ALLE
-         Gespraechsteilnehmer der Aufnahme und Verarbeitung vorher ausdruecklich
-         zugestimmt haben.</p>
-      <p>Das heimliche Aufnehmen des nichtoeffentlich gesprochenen Wortes ist in
-         Deutschland strafbar (&sect; 201 StGB &mdash; Verletzung der Vertraulichkeit
-         des Wortes); zusaetzlich gelten die Anforderungen der DSGVO. Diese App ist
-         fuer Test- und Uebungsinterviews gedacht. Die Verantwortung fuer den
-         rechtmaessigen Einsatz liegt vollstaendig bei dir.</p>
+      <h2>&sect; Legal notice</h2>
+      <p>This app records conversations (microphone + system audio), transcribes
+         them, and sends audio, transcripts and, if used, screenshots to external
+         AI services (Replicate) for processing.</p>
+      <p class="legalStrong">Using this app is only permitted if ALL conversation
+         participants have given their explicit prior consent to the recording
+         and processing.</p>
+      <p>Secretly recording non-public spoken words is a criminal offence in many
+         jurisdictions (e.g. &sect; 201 of the German Criminal Code — violation of
+         the confidentiality of the spoken word); data-protection laws such as
+         the GDPR apply additionally. This app is intended for practice and mock
+         interviews. You bear full responsibility for using it lawfully.</p>
       <div class="dialogButtons">
-        <button id="btnLegalDecline">Schliessen</button>
-        <button id="btnLegalAccept" class="primary">Verstanden &mdash; alle Parteien stimmen zu</button>
+        <button id="btnLegalDecline">Close</button>
+        <button id="btnLegalAccept" class="primary">Understood &mdash; all parties consent</button>
       </div>
     </div>
   </dialog>
