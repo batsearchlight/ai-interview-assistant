@@ -2,7 +2,7 @@
 
 <p align="center"><img src="assets/icon.png" width="128" alt="Interview Helper" /></p>
 
-<p align="center"><em>A real-time AI companion that listens to your (practice) interview and quietly hands you the answers.</em></p>
+<p align="center"><em>Live transcription and short AI answer hints for practice interviews. Runs locally, talks to Replicate.</em></p>
 
 <p align="center">
   <a href="https://github.com/batsearchlight/interview-helper/actions/workflows/ci.yml"><img src="https://github.com/batsearchlight/interview-helper/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
@@ -10,125 +10,112 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license" /></a>
 </p>
 
-## Why does this exist?
+## What is this?
 
-You know those **trivia-style interviews**? The ones where someone just fires
-random questions at you, rapid-fire, one after another — "What are Angular
-directives?", "How does a token bucket work?", "Explain event bubbling" — and
-your brain picks exactly that moment to go completely blank?
+Some interviews are basically quizzes. Someone reads questions off a list —
+"What are Angular directives?", "How does a token bucket work?" — and you
+answer until the list runs out. If you've ever blanked on something you
+definitely know, that's the situation this tool is built for.
 
-That's the itch this scratches. Interview Helper runs quietly in the
-background on your machine, listens to both sides of the conversation
-(your mic *and* the system audio, so it knows who said what), transcribes
-everything live, and the moment a question lands, a short, scannable answer
-suggestion pops up. Not an essay. Not a lecture. Just the two or three key
-points you need to sound like you didn't just panic.
+It listens to the call (your microphone and the system audio as separate
+channels, so it knows who said what), transcribes everything live, and when a
+question comes in it puts a short answer hint on your screen. Two or three
+bullet points, not a wall of text.
 
-It's built for **practice and mock interviews** — grinding trivia rounds,
-rehearsing behavioral questions, drilling a specific topic before the real
-thing. And since everything runs through [Replicate](https://replicate.com),
-one API key gets you transcription, answers *and* vision — with every model
-freely swappable.
+It's meant for practicing: trivia rounds, mock interviews, drilling a specific
+topic before the real thing. All AI calls go through
+[Replicate](https://replicate.com), so a single API key covers transcription,
+answers and vision, and every model can be swapped for another one.
 
 ## What it looks like
 
-Left side: the live transcript, cleanly split between the interviewer and you.
-Right side: the AI suggestions — each one starts with the question *as the AI
-understood it* (super useful when speech recognition turns "Angular directives"
-into "Angela directives"), followed by ultra-short bullets. Need more? Every
-card has one-click follow-ups: **➕ More**, **`</>` Code** (with syntax
-highlighting), **⚖ Pros/Cons**, **🧩 Examples**.
+Transcript on the left, split by speaker. Suggestions on the right. Each
+suggestion starts with the question as the AI understood it — which matters,
+because speech recognition likes to turn "Angular directives" into "Angela
+directives". Below that, one or two bullet points. If you need more, each card
+has buttons for more detail, a code example, pros/cons, or concrete examples.
 
 ![Main window](assets/screenshots/main-window.png)
 
-## It actually gets how interviews work
+## Interview flow logic
 
-This is not a "throw every sentence at an LLM" app. Interviews have a rhythm:
-a question gets asked → you answer → then either a **follow-up on the same
-topic** or a **jump to the next one**. Interview Helper is built around exactly
-that flow. Before answering anything, the AI classifies every interviewer
-statement:
+The app doesn't just throw every sentence at an LLM. It first classifies what
+the interviewer said:
 
-- **New topic?** → A 📌 topic marker appears in both panels and you get a fresh,
-  short answer. Works even when it's not a grammatical question — "So, Angular
-  directives." counts.
-- **Follow-up on the current topic?** → You get an indented ↳ card with *only
-  the new information*, building on what was already suggested. No repetition,
-  no starting over.
-- **Already covered / just small talk?** → Silence. No card. The app knows when
-  it has nothing useful to add, which matters more than you'd think.
+- **New question or topic** → a 📌 marker appears in both panels and you get a
+  fresh answer card. This also works when it isn't phrased as a question —
+  "So, Angular directives." counts.
+- **Follow-up on the current topic** → an indented ↳ card that only adds new
+  information on top of what was already suggested, instead of answering the
+  whole thing again.
+- **Nothing new** (small talk, or the question is already covered) → no card.
 
-So instead of an endless soup of disconnected AI answers, you get a **threaded
-conversation** that stays on topic, goes deeper when the interviewer digs
-deeper, and moves on when they do.
+The result reads like one thread per topic instead of a pile of unrelated AI
+answers, and an old topic doesn't get overwritten just because a new one
+started.
 
-## The Companion 🤖
+## Companion mode
 
-Here's the problem with any interview helper: you can't keep squinting at a
-second app while you're talking. People notice. It's awkward.
-
-That's what **Companion mode** is for. Flip the toggle and the AI checks the
-conversation on its own — at a configurable interval and instantly when a
-question is detected — and when (and *only* when) it has something genuinely
-helpful, a compact note fades in **as an overlay on whichever display you
-choose**. Right next to your meeting window, on your second monitor, wherever
-your eyes already are. No tabbing, no squinting.
+Staring at a second window while someone is talking to you is pretty obvious.
+Companion mode is the fix: the AI checks the conversation on its own — on an
+interval, plus immediately when a question is detected — and shows its notes as
+an overlay on a display of your choosing, so the hint is where you're already
+looking.
 
 <p align="center"><img src="assets/screenshots/companion-overlay.png" width="440" alt="Companion overlay" /></p>
 
-The overlay behaves like a conversation thread, not a notification spammer:
+A few details that took some iterations to get right:
 
-- It **stays visible as long as the question is in the room** and disappears
-  once you've answered it (the AI detects that too).
-- Follow-up questions stack up as **additional popups underneath** — the window
-  grows, nothing scrolls, nothing gets overwritten mid-sentence.
-- If the interviewer is still refining their question ("well, what I actually
-  mean is…"), the Companion waits instead of blurting out a wrong answer — and
-  posts a "↳ Clarified" correction if the question shifts mid-flight.
-- A full topic change can be gated behind a **confirmation** ("Switch / Keep"),
-  so nothing yanks the current thread away while you're still using it.
-- And yes, the follow-up buttons (More / Code / Pros/Cons / Examples) live
-  right on the overlay too.
+- The note stays up while the question is open and goes away once the AI sees
+  you've answered it.
+- Follow-up questions are added as extra blocks below. The overlay grows
+  instead of scrolling, and never replaces what you're currently reading.
+- If the interviewer is still rephrasing their question, the AI waits rather
+  than answering the wrong thing. If the question shifts after a note was
+  already shown, it posts a "↳ Clarified" correction.
+- A full topic change can be gated behind a click ("Switch" / "Keep"), so the
+  overlay doesn't jump away mid-answer.
+- The follow-up buttons (more / code / pros-cons / examples) are on the overlay
+  as well.
 
-## Bonus round: screen analysis 📸
+## Screen analysis
 
-Sometimes the vital info isn't in the audio — it's on the screen. A shared
-task description, a code snippet, an architecture diagram. Define a screen
-region once, then hit **Analyze**: the app screenshots that region, sends it
-together with the conversation context to a vision model, and gives you the
-short version — key facts, numbers, edge cases, and (when a picture beats
-words) a small rendered **Mermaid diagram**.
+Sometimes the important information is on the screen, not in the audio — a
+shared task description, a code snippet, a diagram. Select a screen region
+once, then hit **Analyze**: the screenshot plus the recent conversation goes to
+a vision model and you get the key facts back, with a small Mermaid diagram
+when structure is easier to read than prose.
 
 ![Screen analysis and quick tip](assets/screenshots/main-window-analysis.png)
 
-There's also a **💡 Quick tip** button (Ctrl+T) that takes nothing but the
-conversation history and tells you the one thing worth saying next.
+There's also a quick tip button (Ctrl+T) that takes nothing but the
+conversation history and suggests whatever seems most useful at that moment.
 
-*All screenshots show fictional demo content.*
+The screenshots show demo content, not a real conversation.
 
-## The feature list, rapid-fire
+## Feature overview
 
-- 🎙 **Dual-channel live transcription** — mic + system loopback, per-speaker
-  attribution, client-side VAD, long statements split into configurable
-  segments so text appears while people are still talking
-- 🧠 **Interview-flow logic** — topic threading, follow-up detection,
-  knows-when-to-shut-up classification
-- 🤖 **Companion overlay** — persistent, auto-growing popup stack on any display
-- 📸 **Screen region analysis** with vision models + Mermaid rendering
-- 🔁 **Follow-ups everywhere** — more detail, code examples, pros/cons, examples
-- 🔧 **Every model swappable** — STT, LLM and vision model picked from live
-  Replicate collections (or type any `owner/name`); the app reads each model's
-  schema automatically, so most community models just work
-- 🌍 **Multi-language** — English, German, Hindi, Chinese, Japanese, Spanish,
-  French, or auto-detect
-- 💰 **Live session cost estimate** in the top bar
-- 💾 **Conversation management** — save, browse and delete past sessions
-- ⚖ **Built-in legal notice** that must be accepted before recording
+- Dual-channel live transcription (mic + system loopback) with client-side VAD;
+  long statements are split into segments so text shows up while people are
+  still talking
+- Interview flow classification: topic threading, follow-up detection, and
+  staying quiet when there's nothing to add
+- Companion overlay on any display, growing popup stack, no scrolling
+- Screen region analysis with vision models, Mermaid rendering, code
+  highlighting
+- All three models (STT / LLM / vision) picked from live Replicate collections,
+  or type any `owner/name` — the app reads each model's schema, so most
+  community models work without code changes
+- Languages: English, German, Hindi, Chinese, Japanese, Spanish, French, or
+  auto-detect
+- Session cost estimate in the top bar
+- Save, browse and delete past conversations
+- Legal notice that has to be accepted before recording starts
 
 ## Getting started
 
-**Option 1 — download a build.** Grab the latest installer for your OS from the
-[Releases page](https://github.com/batsearchlight/interview-helper/releases/latest):
+**Option 1 — download a build** from the
+[releases page](https://github.com/batsearchlight/interview-helper/releases/latest):
 
 | OS | File |
 |---|---|
@@ -136,11 +123,11 @@ conversation history and tells you the one thing worth saying next.
 | macOS | `Interview-Helper-*-mac-universal.dmg` (Intel + Apple Silicon) |
 | Linux | `Interview-Helper-*-linux-x86_64.AppImage` or `.deb` |
 
-> Heads-up: the builds are not code-signed, so Windows SmartScreen / macOS
-> Gatekeeper will ask you to confirm the first launch (macOS: right-click →
-> Open). System-audio loopback capture is currently Windows-only; on macOS and
-> Linux you'll need a virtual audio device (e.g. BlackHole / PulseAudio monitor)
-> routed as the default input for the "partner" channel.
+The builds are not code-signed, so Windows SmartScreen / macOS Gatekeeper will
+ask you to confirm the first launch (macOS: right-click → Open). System-audio
+loopback capture currently only works on Windows; on macOS and Linux you need
+a virtual audio device (BlackHole, PulseAudio monitor) routed into the
+"partner" channel.
 
 **Option 2 — run from source:**
 
@@ -149,30 +136,30 @@ npm install
 npm start
 ```
 
-1. Grab a Replicate API key from https://replicate.com/account/api-tokens and
-   drop it into the settings (or set `REPLICATE_API_TOKEN`).
-2. Optionally pick your models and fill in your **profile** (role, skills,
-   projects) — it flows into every answer, and it's what helps the AI
+Then:
+
+1. Get a Replicate API key from https://replicate.com/account/api-tokens and
+   put it into the settings (or set `REPLICATE_API_TOKEN`).
+2. Optionally pick your models and fill in your profile (role, skills,
+   projects). The profile goes into every prompt and is also what helps the AI
    reconstruct garbled technical terms.
-3. Hit **Start recording**, share any screen when Windows asks (only the audio
-   is used), allow the mic — done.
+3. Hit **Start recording**, share any screen when asked (only the audio is
+   used), allow the microphone.
 
 ## Good to know
 
-- System audio loopback works out of the box on **Windows** (Electron
-  `audio: 'loopback'`).
-- Everything is stored locally in `%APPDATA%/interview-helper/` — key, model
-  choices, saved conversations.
-- Latency vs. accuracy is yours to tune: fast models
+- Everything is stored locally in `%APPDATA%/interview-helper/` — the key,
+  model choices and saved conversations. There is no telemetry.
+- Latency vs. accuracy is a tradeoff you control: fast models
   (`anthropic/claude-4.5-haiku`, `openai/gpt-5-mini`) and 1 s segments for
-  speed, bigger models and 3-5 s segments for quality.
-- Sharing your screen? Put the Companion overlay on a display you're **not**
-  sharing. 😉
-- ⚖ **The serious part:** this is meant for practice and mock interviews.
+  speed, bigger models and 3–5 s segments for quality.
+- If you share your screen in a meeting, put the companion overlay on a
+  display you are not sharing.
+- **The serious part:** this is meant for practice and mock interviews.
   Recording real people requires their explicit consent — secretly recording
-  non-public speech is a criminal offence in many jurisdictions (e.g. § 201 of
-  the German Criminal Code), and GDPR applies on top. You are responsible for
-  using this lawfully.
+  non-public speech is a criminal offence in many jurisdictions (in Germany:
+  § 201 StGB), and data protection laws like the GDPR apply on top. You are
+  responsible for using this lawfully.
 
 ## Under the hood
 
@@ -201,5 +188,5 @@ renderer/
 ## License
 
 MIT — see [LICENSE](LICENSE). Bundled libraries: [Mermaid](https://mermaid.js.org/)
-(MIT) and [highlight.js](https://highlightjs.org/) (BSD-3-Clause), both vendored
-locally under `renderer/vendor/`.
+(MIT) and [highlight.js](https://highlightjs.org/) (BSD-3-Clause), vendored
+under `renderer/vendor/`.
