@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'" />
+  <title>Interview Helper</title>
+  <link rel="stylesheet" href="vendor/hljs.css" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header id="topbar">
+    <div class="left">
+      <button id="btnStart" class="primary">&#9679; Aufnahme starten</button>
+      <button id="btnStop" class="danger" disabled>&#9632; Stopp</button>
+      <button id="btnTip" title="Schnellen Tipp/Antwort nur aus dem Gespraechsverlauf holen (Strg+T)">&#128161; Tipp</button>
+      <button id="btnShot" title="Festgelegten Bildschirmbereich analysieren">&#128248; Analyse</button>
+      <button id="btnRegion" title="Bildschirmbereich fuer die Analyse festlegen">&#9974; Bereich</button>
+      <span class="status">
+        <span id="dotOther" class="dot" title="System-Audio (Gespraechspartner)"></span> Partner
+        <span id="dotMe" class="dot" title="Mikrofon (eigene Stimme)"></span> Ich
+      </span>
+    </div>
+    <div class="right">
+      <span id="cost" title="Geschaetzte KI-Kosten dieser Session">&asymp; $0.0000</span>
+      <label class="toggle" title="Companion Mode: prueft den Verlauf automatisch und blendet hilfreiche Notizen als Overlay ein">
+        <input type="checkbox" id="chkCompanion" /> &#129302; Companion
+      </label>
+      <label class="toggle" title="Fragen automatisch erkennen und beantworten">
+        <input type="checkbox" id="chkAuto" checked /> Auto-Antwort
+      </label>
+      <label class="toggle" title="Fenster immer im Vordergrund">
+        <input type="checkbox" id="chkPin" checked /> &#128204; Pin
+      </label>
+      <button id="btnLegal" title="Rechtlicher Hinweis">&sect;</button>
+      <button id="btnSettings" title="Einstellungen">&#9881;</button>
+    </div>
+  </header>
+
+  <div id="convbar">
+    <button id="btnConvSave" title="Aktuelles Gespraech speichern">&#128190; Speichern</button>
+    <button id="btnConvNew" title="Neues, leeres Gespraech beginnen">&#10010; Neu</button>
+    <span class="spacer"></span>
+    <button id="btnConvPrev" title="Vorheriges gespeichertes Gespraech">&#9664;</button>
+    <span id="convLabel">ungespeichertes Gespraech</span>
+    <button id="btnConvNext" title="Naechstes gespeichertes Gespraech">&#9654;</button>
+    <span class="spacer"></span>
+    <button id="btnConvDelete" class="danger" title="Angezeigtes Gespraech loeschen">&#128465; Loeschen</button>
+  </div>
+
+  <main id="content">
+    <section id="transcriptPane">
+      <h2>Gespraechsverlauf</h2>
+      <div id="transcript"></div>
+    </section>
+
+    <section id="answerPane">
+      <h2>KI-Antwortvorschlaege</h2>
+      <div id="answers"></div>
+      <div id="manualAsk">
+        <input id="manualQuestion" type="text"
+               placeholder="Frage manuell eingeben oder letzte Partner-Aussage nutzen ..." />
+        <button id="btnAsk" class="primary">Antwort</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- Einstellungen -->
+  <dialog id="settingsDialog">
+    <form method="dialog" id="settingsForm">
+      <h2>Einstellungen</h2>
+
+      <label>Replicate API-Key
+        <input type="password" id="setReplicate" placeholder="r8_..." />
+      </label>
+
+      <button type="button" id="btnLoadModels">Modell-Liste von Replicate aktualisieren</button>
+
+      <label>Transkriptions-Modell (Speech-to-Text)
+        <select id="setSttModel"></select>
+        <input type="text" id="setSttCustom" class="hidden"
+               placeholder="owner/name, z.B. openai/whisper" />
+      </label>
+
+      <label>Antwort-Modell (LLM)
+        <select id="setAnswerModel"></select>
+        <input type="text" id="setAnswerCustom" class="hidden"
+               placeholder="owner/name, z.B. anthropic/claude-4.5-haiku" />
+      </label>
+
+      <label>Vision-Modell (Screenshot-Analyse)
+        <select id="setVisionModel"></select>
+        <input type="text" id="setVisionCustom" class="hidden"
+               placeholder="owner/name, z.B. google/gemini-3-flash" />
+      </label>
+
+      <label>Sprache des Interviews
+        <select id="setLanguage">
+          <option value="de">Deutsch</option>
+          <option value="en">Englisch (English)</option>
+          <option value="hi">Hindi (&#2361;&#2367;&#2344;&#2381;&#2342;&#2368;)</option>
+          <option value="zh">Chinesisch (&#20013;&#25991;)</option>
+          <option value="ja">Japanisch (&#26085;&#26412;&#35486;)</option>
+          <option value="es">Spanisch (Espa&ntilde;ol)</option>
+          <option value="fr">Franzoesisch (Fran&ccedil;ais)</option>
+          <option value="">Automatisch erkennen</option>
+        </select>
+      </label>
+
+      <label>Segmentlaenge bei langem Sprechen (Sekunden)
+        <input type="number" id="setSegment" min="0.5" max="30" step="0.5" />
+        <small class="hint">Lange Redebeitraege werden alle N Sekunden zerteilt und
+        sofort transkribiert. Kleiner = schneller sichtbar, groesser = genauer.</small>
+      </label>
+
+      <label>Companion: Pruef-Intervall (Sekunden)
+        <input type="number" id="setCompanionInterval" min="5" max="300" step="5" />
+        <small class="hint">Im Companion Mode prueft die KI den Verlauf in diesem
+        Intervall (und sofort bei erkannten Fragen) und blendet nur dann eine
+        Notiz ein, wenn sie wirklich hilft.</small>
+      </label>
+
+      <label>Companion: Display fuer die Einblendung
+        <select id="setCompanionDisplay"></select>
+      </label>
+
+      <label class="checkRow">
+        <input type="checkbox" id="setTopicConfirm" />
+        Companion: Themenwechsel erst nach Bestaetigung
+        <small class="hint">Bei einem komplett neuen Thema bleibt der aktuelle
+        Gespraechsfaden stehen, bis du im Overlay auf "Wechseln" klickst —
+        nichts wird ueberschrieben, waehrend du gerade mit den Tipps antwortest.</small>
+      </label>
+
+      <label>Eigenes Profil / Kontext (fliesst in die Antworten ein)
+        <textarea id="setProfile" rows="4"
+          placeholder="z.B. Rolle, auf die du dich bewirbst, Kern-Skills, wichtige Projekte ..."></textarea>
+      </label>
+
+      <div class="dialogButtons">
+        <button value="cancel">Abbrechen</button>
+        <button value="save" id="btnSaveSettings" class="primary">Speichern</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Rechtlicher Hinweis -->
+  <dialog id="legalDialog">
+    <div id="legalContent">
+      <h2>&sect; Rechtlicher Hinweis</h2>
+      <p>Diese App nimmt Gespraeche auf (Mikrofon + System-Audio), transkribiert sie
+         und sendet Audio, Transkripte und ggf. Bildschirmfotos zur Verarbeitung an
+         externe KI-Dienste (Replicate).</p>
+      <p class="legalStrong">Die Nutzung ist nur zulaessig, wenn ALLE
+         Gespraechsteilnehmer der Aufnahme und Verarbeitung vorher ausdruecklich
+         zugestimmt haben.</p>
+      <p>Das heimliche Aufnehmen des nichtoeffentlich gesprochenen Wortes ist in
+         Deutschland strafbar (&sect; 201 StGB &mdash; Verletzung der Vertraulichkeit
+         des Wortes); zusaetzlich gelten die Anforderungen der DSGVO. Diese App ist
+         fuer Test- und Uebungsinterviews gedacht. Die Verantwortung fuer den
+         rechtmaessigen Einsatz liegt vollstaendig bei dir.</p>
+      <div class="dialogButtons">
+        <button id="btnLegalDecline">Schliessen</button>
+        <button id="btnLegalAccept" class="primary">Verstanden &mdash; alle Parteien stimmen zu</button>
+      </div>
+    </div>
+  </dialog>
+
+  <script src="vendor/mermaid.min.js"></script>
+  <script src="vendor/highlight.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

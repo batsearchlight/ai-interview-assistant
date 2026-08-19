@@ -1,0 +1,12 @@
+{
+  "name": "interview-helper",
+  "version": "0.1.0",
+  "description": "Companion-App: Live-Transkription von Interviews mit KI-Antwortvorschlaegen",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "latest"
+  }
+}

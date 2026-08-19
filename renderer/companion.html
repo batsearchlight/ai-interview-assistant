@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'" />
+  <title>Companion</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { background: transparent; overflow: hidden; }
+    body { font-family: "Segoe UI", system-ui, sans-serif; color: #e6e8ee; }
+
+    #stack {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 6px;
+    }
+
+    .pop {
+      background: rgba(22, 25, 32, 0.97);
+      border: 1px solid #4f8cff;
+      border-left: 4px solid #4f8cff;
+      border-radius: 12px;
+      padding: 10px 12px;
+      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+    }
+
+    /* Haupt-Karte: Thema + Antwort + Aktionen */
+    #head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    #head .tag {
+      font-size: 10.5px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #9aa1af;
+      white-space: nowrap;
+    }
+    #topic {
+      flex: 1;
+      font-size: 13px;
+      font-weight: 600;
+      color: #4f8cff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    #btnClose {
+      background: transparent;
+      border: none;
+      color: #9aa1af;
+      font-size: 15px;
+      cursor: pointer;
+      padding: 0 2px;
+      line-height: 1;
+    }
+    #btnClose:hover { color: #ff5c5c; }
+
+    .ptext {
+      font-size: 14.5px;
+      font-weight: 500;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    /* Vertiefungs-Popups */
+    .pop.deep { border-color: #ffb84f; border-left-color: #ffb84f; }
+    .pop.deep .btag {
+      display: block;
+      font-size: 10.5px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #ffb84f;
+      margin-bottom: 4px;
+    }
+
+    /* Themenwechsel-Bestaetigung */
+    .pop.confirm {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      border-color: #ffb84f;
+      border-left-color: #ffb84f;
+      background: rgba(50, 40, 22, 0.97);
+      font-size: 12px;
+      color: #ffb84f;
+    }
+    .pop.confirm.visible { display: flex; }
+    .pop.confirm span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .pop.confirm button {
+      background: #20242d;
+      border: 1px solid #ffb84f;
+      border-radius: 6px;
+      color: #ffb84f;
+      font-size: 11px;
+      padding: 3px 8px;
+      cursor: pointer;
+    }
+    .pop.confirm button:hover { background: #ffb84f; color: #14171d; }
+
+    #actions {
+      display: flex;
+      gap: 6px;
+      margin-top: 8px;
+      padding-top: 7px;
+      border-top: 1px solid #2c313c;
+    }
+    #actions button {
+      background: #20242d;
+      border: 1px solid #2c313c;
+      border-radius: 6px;
+      color: #9aa1af;
+      font-size: 11px;
+      padding: 3px 8px;
+      cursor: pointer;
+    }
+    #actions button:hover { color: #e6e8ee; border-color: #4f8cff; }
+    #actions button:disabled { opacity: 0.4; cursor: default; }
+  </style>
+</head>
+<body>
+  <div id="stack">
+    <div id="confirmBar" class="pop confirm">
+      <span id="confirmText"></span>
+      <button id="btnTopicYes" title="Zum neuen Thema wechseln">Wechseln</button>
+      <button id="btnTopicNo" title="Aktuelles Thema behalten">Behalten</button>
+    </div>
+
+    <div id="mainPop" class="pop">
+      <div id="head">
+        <span class="tag">&#129302; Companion</span>
+        <span id="topic"></span>
+        <button id="btnClose" title="Einblendung schliessen">&#10005;</button>
+      </div>
+      <div id="mainText" class="ptext"></div>
+      <div id="actions">
+        <button data-mode="elaborate" title="Etwas mehr Detail">&#10133; Mehr</button>
+        <button data-mode="code" title="Kleines Code-Beispiel">&lt;/&gt; Code</button>
+        <button data-mode="proscons" title="Pro- und Kontra-Liste">&#9878; Pro/Kontra</button>
+        <button data-mode="examples" title="Konkrete Beispiele">&#129513; Beispiele</button>
+      </div>
+    </div>
+  </div>
+  <script src="companion.js"></script>
+</body>
+</html>
