@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    name: Syntax check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Check JavaScript syntax
+        run: |
+          for f in main.js preload.js overlay-preload.js companion-preload.js \
+                   renderer/app.js renderer/overlay.js renderer/companion.js \
+                   renderer/pcm-worklet.js renderer/companion.js; do
+            node --check "$f"
+            echo "OK $f"
+          done
+
+  pack:
+    name: Build smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Package (unpacked, no installer)
+        run: npx electron-builder --dir

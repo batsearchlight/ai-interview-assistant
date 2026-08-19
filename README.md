@@ -4,6 +4,12 @@
 
 <p align="center"><em>A real-time AI companion that listens to your (practice) interview and quietly hands you the answers.</em></p>
 
+<p align="center">
+  <a href="https://github.com/batsearchlight/interview-helper/actions/workflows/ci.yml"><img src="https://github.com/batsearchlight/interview-helper/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://github.com/batsearchlight/interview-helper/releases/latest"><img src="https://img.shields.io/github/v/release/batsearchlight/interview-helper?include_prereleases" alt="Latest release" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license" /></a>
+</p>
+
 ## Why does this exist?
 
 You know those **trivia-style interviews**? The ones where someone just fires
@@ -120,6 +126,23 @@ conversation history and tells you the one thing worth saying next.
 - ⚖ **Built-in legal notice** that must be accepted before recording
 
 ## Getting started
+
+**Option 1 — download a build.** Grab the latest installer for your OS from the
+[Releases page](https://github.com/batsearchlight/interview-helper/releases/latest):
+
+| OS | File |
+|---|---|
+| Windows | `Interview-Helper-*-win-x64.exe` (installer) or `*-portable` |
+| macOS | `Interview-Helper-*-mac-universal.dmg` (Intel + Apple Silicon) |
+| Linux | `Interview-Helper-*-linux-x86_64.AppImage` or `.deb` |
+
+> Heads-up: the builds are not code-signed, so Windows SmartScreen / macOS
+> Gatekeeper will ask you to confirm the first launch (macOS: right-click →
+> Open). System-audio loopback capture is currently Windows-only; on macOS and
+> Linux you'll need a virtual audio device (e.g. BlackHole / PulseAudio monitor)
+> routed as the default input for the "partner" channel.
+
+**Option 2 — run from source:**
 
 ```bash
 npm install
